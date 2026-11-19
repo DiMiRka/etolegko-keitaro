@@ -4,17 +4,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.errors import AppError as StreamError
+from app.errors import NotFound
 from app.keitaro import KeitaroClient, KeitaroError
 from app.models import Campaign, OfferState, Stream, StreamOffer
 from app.weights import WeightError, rebalance
-
-
-class StreamError(Exception):
-    pass
-
-
-class NotFound(StreamError):
-    pass
 
 
 async def load_campaign(session: AsyncSession, campaign_id: int) -> Campaign:
