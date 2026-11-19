@@ -1,21 +1,13 @@
 import unittest
 
-from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 
 from app import campaigns
-from app.config import Settings
 from app.db import Base, make_engine, make_sessionmaker
-from app.deps import get_catalog, get_keitaro, get_session, settings_dep
 from app.errors import AppError
 from app.keitaro import KeitaroError
-from app.main import app
 from app.offers import OfferCatalog
-
-SETTINGS = Settings(
-    _env_file=None, keitaro_api_key="x", campaign_prefix="test_mironov_",
-    keitaro_domain_id=1, keitaro_group_id=2, keitaro_traffic_source_id=3,
-)
+from tests.helpers import SETTINGS, ApiCase
 
 
 class FakeKeitaro:
@@ -151,44 +143,21 @@ class OfferCatalogTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(kt.offer_calls, 1)
 
 
-class CampaignApiTest(unittest.TestCase):
-    def setUp(self):
-        self.kt = FakeKeitaro()
-        self.engine = None
-
-        async def session_override():
-            if self.engine is None:
-                self.engine = make_engine("sqlite+aiosqlite://", poolclass=StaticPool)
-                async with self.engine.begin() as conn:
-                    await conn.run_sync(Base.metadata.create_all)
-            async with make_sessionmaker(self.engine)() as s:
-                yield s
-
-        app.dependency_overrides = {
-            get_session: session_override,
-            get_keitaro: lambda: self.kt,
-            get_catalog: lambda: OfferCatalog(self.kt),
-            settings_dep: lambda: SETTINGS,
-        }
-        self.addCleanup(lambda: setattr(app, "dependency_overrides", {}))
+class CampaignApiTest(ApiCase):
+    def make_keitaro(self):
+        return FakeKeitaro()
 
     def test_create_and_errors(self):
-        with TestClient(app) as client:
-            r = client.post("/api/campaigns", json={"name": "c1", "geo": "mx", "offer_id": 18813})
-            self.assertEqual(r.status_code, 201, r.text)
-            body = r.json()
-            self.assertEqual((body["name"], body["geo"], len(body["streams"])), ("test_mironov_c1", "MX", 2))
-            self.assertEqual(body["streams"][1]["offers"][0]["share"], 100)
+        body = self.ok("POST", "/api/campaigns", 201, json={"name": "c1", "geo": "mx", "offer_id": 18813})
+        self.assertEqual((body["name"], body["geo"], len(body["streams"])), ("test_mironov_c1", "MX", 2))
+        self.assertEqual(body["streams"][1]["offers"][0]["share"], 100)
 
-            r = client.post("/api/campaigns", json={"name": "c1", "geo": "m1", "offer_id": 18813})
-            self.assertEqual(r.status_code, 400)
+        self.ok("POST", "/api/campaigns", 400, json={"name": "c1", "geo": "m1", "offer_id": 18813})
+        self.ok("POST", "/api/campaigns", 422, json={"name": "c1", "geo": "MX"})
 
-            r = client.post("/api/campaigns", json={"name": "c1", "geo": "MX"})
-            self.assertEqual(r.status_code, 422)
-
-            r = client.get("/api/offers", params={"q": "flex"})
-            self.assertEqual(r.json(), [{"id": 18813, "name": "18813 Flexacil PE"}])
-            client.portal.call(self.engine.dispose)
+        offers = self.ok("GET", "/api/offers", params={"q": "flex"})
+        self.assertEqual(offers, [{"id": 18813, "name": "18813 Flexacil PE"}])
+        self.assertEqual(len(self.ok("GET", "/api/campaigns")), 1)
 
 
 if __name__ == "__main__":

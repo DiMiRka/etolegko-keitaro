@@ -9,6 +9,26 @@ class CampaignCreate(BaseModel):
     offer_id: int
 
 
+class CampaignImport(BaseModel):
+    keitaro_id: int
+
+
+class OfferAdd(BaseModel):
+    offer_id: int
+
+
+class PinIn(BaseModel):
+    pinned: bool
+    share: int | None = Field(default=None, ge=0, le=100)
+
+
+class CampaignShort(BaseModel):
+    id: int
+    keitaro_id: int
+    name: str
+    geo: str | None
+
+
 class OfferOut(BaseModel):
     id: int
     name: str

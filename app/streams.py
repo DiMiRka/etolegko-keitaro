@@ -42,7 +42,12 @@ async def import_campaign(session: AsyncSession, kt: KeitaroClient, keitaro_id: 
     existing = await session.scalar(select(Campaign).where(Campaign.keitaro_id == keitaro_id))
     if existing is not None:
         return await load_campaign(session, existing.id)
-    data = await kt.get_campaign(keitaro_id)
+    try:
+        data = await kt.get_campaign(keitaro_id)
+    except KeitaroError as e:
+        if e.status == 404:
+            raise NotFound(f"Кампании {keitaro_id} нет в Keitaro") from e
+        raise
     campaign = Campaign(keitaro_id=data["id"], name=data["name"], alias=data["alias"])
     session.add(campaign)
     await session.commit()

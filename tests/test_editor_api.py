@@ -1,0 +1,87 @@
+import unittest
+
+from app.keitaro import KeitaroError
+from tests.helpers import ApiCase
+from tests.test_streams import CAMPAIGN_KT_ID, OFFER_STREAM_ID, FakeKeitaro
+
+
+class EditorKeitaro(FakeKeitaro):
+    async def get_campaign(self, campaign_id):
+        if campaign_id == CAMPAIGN_KT_ID:
+            return {"id": campaign_id, "name": "test_mironov_editor", "alias": "e"}
+        raise KeitaroError("Keitaro HTTP 404: not found", 404)
+
+
+class EditorApiTest(ApiCase):
+    def make_keitaro(self):
+        return EditorKeitaro()
+
+    def setUp(self):
+        super().setUp()
+        campaign = self.ok("POST", "/api/campaigns/import", json={"keitaro_id": CAMPAIGN_KT_ID})
+        self.campaign_id = campaign["id"]
+        self.sid = next(s["id"] for s in campaign["streams"] if s["keitaro_id"] == OFFER_STREAM_ID)
+
+    def shares(self, stream):
+        return {o["offer_id"]: o["share"] for o in stream["offers"]}
+
+    def test_full_cycle(self):
+        base = f"/api/streams/{self.sid}"
+
+        s = self.ok("POST", f"{base}/offers", json={"offer_id": 4})
+        self.assertEqual(self.shares(s), {1: 25, 2: 25, 3: 25, 4: 25})
+        self.assertTrue(s["is_dirty"])
+        self.assertEqual(self.kt.kt_offers(), {1: 34, 2: 33, 3: 33})
+
+        s = self.ok("POST", f"{base}/push")
+        self.assertFalse(s["is_dirty"])
+        self.assertEqual(self.kt.kt_offers(), {1: 25, 2: 25, 3: 25, 4: 25})
+
+        s = self.ok("POST", f"{base}/offers/1/pin", json={"pinned": True})
+        self.assertTrue(next(o for o in s["offers"] if o["offer_id"] == 1)["pinned"])
+
+        s = self.ok("POST", f"{base}/offers/4/remove")
+        self.assertEqual(self.shares(s), {1: 25, 2: 38, 3: 37, 4: 0})
+        removed = next(o for o in s["offers"] if o["offer_id"] == 4)
+        self.assertEqual(removed["state"], "removed")
+
+        s = self.ok("POST", f"{base}/push")
+        self.assertEqual(self.kt.kt_offers(), {1: 25, 2: 38, 3: 37})
+
+        s = self.ok("POST", f"{base}/offers/4/bring-back")
+        self.assertEqual(self.shares(s), {1: 25, 2: 25, 3: 25, 4: 25})
+        s = self.ok("POST", f"{base}/cancel")
+        self.assertEqual(self.shares(s), {1: 25, 2: 38, 3: 37, 4: 0})
+        self.assertFalse(s["is_dirty"])
+
+    def test_fetch_marks_deleted_in_keitaro(self):
+        self.kt.streams[OFFER_STREAM_ID]["offers"].pop(0)
+        c = self.ok("POST", f"/api/campaigns/{self.campaign_id}/fetch")
+        stream = next(s for s in c["streams"] if s["id"] == self.sid)
+        self.assertEqual(next(o for o in stream["offers"] if o["offer_id"] == 1)["state"], "removed")
+
+    def test_errors(self):
+        base = f"/api/streams/{self.sid}"
+        self.ok("POST", f"{base}/offers", 400, json={"offer_id": 2})
+        self.ok("POST", f"{base}/offers", 400, json={"offer_id": 999})
+        self.ok("POST", f"{base}/offers/999/remove", 404)
+        self.ok("POST", "/api/streams/12345/push", 404)
+        self.ok("POST", f"{base}/offers/1/pin", 422, json={"pinned": True, "share": 101})
+        self.kt.fail_update = True
+        self.ok("POST", f"{base}/offers", json={"offer_id": 4})
+        self.ok("POST", f"{base}/push", 400)
+        s = self.ok("GET", f"/api/campaigns/{self.campaign_id}")
+        stream = next(x for x in s["streams"] if x["id"] == self.sid)
+        self.assertTrue(stream["is_dirty"])
+        self.assertIn("boom", stream["last_error"])
+
+    def test_import_unknown_campaign(self):
+        self.ok("POST", "/api/campaigns/import", 404, json={"keitaro_id": 1})
+
+    def test_import_is_idempotent(self):
+        again = self.ok("POST", "/api/campaigns/import", json={"keitaro_id": CAMPAIGN_KT_ID})
+        self.assertEqual(again["id"], self.campaign_id)
+
+
+if __name__ == "__main__":
+    unittest.main()
