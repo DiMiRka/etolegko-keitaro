@@ -70,5 +70,9 @@ class StreamOffer(Base):
     stream: Mapped[Stream] = relationship(back_populates="offers")
 
     @property
+    def is_active(self) -> bool:
+        return self.state == OfferState.active
+
+    @property
     def is_dirty(self) -> bool:
         return self.share != self.published_share or self.state != self.published_state

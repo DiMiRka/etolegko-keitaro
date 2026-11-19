@@ -7,8 +7,8 @@ class Base(DeclarativeBase):
     pass
 
 
-def make_engine(url: str) -> AsyncEngine:
-    engine = create_async_engine(url)
+def make_engine(url: str, **kwargs) -> AsyncEngine:
+    engine = create_async_engine(url, **kwargs)
     if engine.dialect.name == "sqlite":
         @event.listens_for(engine.sync_engine, "connect")
         def _fk_on(dbapi_conn, _):
