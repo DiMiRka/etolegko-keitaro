@@ -75,6 +75,15 @@ class EditorApiTest(ApiCase):
         self.assertTrue(stream["is_dirty"])
         self.assertIn("boom", stream["last_error"])
 
+    def test_pages_render(self):
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("New campaign", r.text)
+        r = self.client.get(f"/campaigns/{self.campaign_id}")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(f"/admin/#!/campaign/{CAMPAIGN_KT_ID}", r.text)
+        self.assertEqual(self.client.get("/campaigns/999").status_code, 404)
+
     def test_import_unknown_campaign(self):
         self.ok("POST", "/api/campaigns/import", 404, json={"keitaro_id": 1})
 

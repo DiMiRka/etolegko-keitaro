@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Campaigns · Keitaro wrapper{% endblock %}
+{% block content %}
+<nav class="crumbs">Campaigns</nav>
+
+<div class="grid">
+  <section class="card">
+    <h2>New campaign</h2>
+    <form id="create-form" class="form">
+      <label>Name
+        <div class="prefixed"><span>{{ prefix }}</span><input name="name" required placeholder="campaign1" autocomplete="off"></div>
+      </label>
+      <label>Geo
+        <input name="geo" required maxlength="2" placeholder="MX, AU, RO, ..." autocomplete="off" class="geo">
+      </label>
+      <label>Offer
+        <select name="offer_id" class="offer-select" required></select>
+      </label>
+      <button type="submit" class="btn primary">Create</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Open existing campaign</h2>
+    <form id="import-form" class="form">
+      <label>Keitaro campaign ID
+        <input name="keitaro_id" type="number" min="1" required placeholder="215350">
+      </label>
+      <button type="submit" class="btn">Import</button>
+    </form>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Campaigns</h2>
+  <table class="table" id="campaigns">
+    <thead><tr><th>Name</th><th>Geo</th><th>Keitaro ID</th></tr></thead>
+    <tbody><tr><td colspan="3" class="muted">Загрузка…</td></tr></tbody>
+  </table>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(function () {
+  App.offerSelect($('#create-form .offer-select'), 'Search offer by name or ID');
+
+  function loadCampaigns() {
+    App.api('GET', '/api/campaigns').done(function (rows) {
+      var $tb = $('#campaigns tbody').empty();
+      if (!rows.length) {
+        $tb.append('<tr><td colspan="3" class="muted">Пока пусто: создайте или импортируйте кампанию</td></tr>');
+      }
+      rows.forEach(function (c) {
+        $('<tr>')
+          .append($('<td>').append($('<a>').attr('href', '/campaigns/' + c.id).text(c.name)))
+          .append($('<td>').text(c.geo || '—'))
+          .append($('<td>').text(c.keitaro_id))
+          .appendTo($tb);
+      });
+    });
+  }
+
+  $('#create-form').on('submit', function (e) {
+    e.preventDefault();
+    var f = this;
+    var body = {name: f.name.value, geo: f.geo.value, offer_id: Number($(f.offer_id).val())};
+    if (!body.offer_id) { App.toast('Выберите оффер', true); return; }
+    App.busy($(f).find('button'), App.api('POST', '/api/campaigns', body)).done(function (c) {
+      window.location = '/campaigns/' + c.id;
+    });
+  });
+
+  $('#import-form').on('submit', function (e) {
+    e.preventDefault();
+    var body = {keitaro_id: Number(this.keitaro_id.value)};
+    App.busy($(this).find('button'), App.api('POST', '/api/campaigns/import', body)).done(function (c) {
+      window.location = '/campaigns/' + c.id;
+    });
+  });
+
+  loadCampaigns();
+});
+</script>
+{% endblock %}

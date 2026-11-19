@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +14,7 @@ from app.deps import get_session
 from app.errors import AppError, NotFound
 from app.keitaro import KeitaroClient, KeitaroError
 from app.offers import OfferCatalog
+from app.web import router as web_router
 
 
 @asynccontextmanager
@@ -32,7 +35,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Keitaro wrapper", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 app.include_router(api_router)
+app.include_router(web_router)
 
 
 @app.exception_handler(AppError)

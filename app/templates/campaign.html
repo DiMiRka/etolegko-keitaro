@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ campaign.name }} · Keitaro Streams{% endblock %}
+{% block content %}
+<nav class="crumbs">
+  <a href="/">Campaigns</a> / <span>{{ campaign.name }}</span> / <span>Keitaro Streams</span>
+</nav>
+
+<div class="page-head">
+  <div>
+    <h1>{{ campaign.name }}</h1>
+    <div class="muted">Keitaro ID {{ campaign.keitaro_id }}{% if campaign.geo %} · Geo {{ campaign.geo }}{% endif %}</div>
+  </div>
+  <div class="actions">
+    <button class="btn primary" id="fetch">Fetch streams from KT</button>
+    <a class="btn" href="{{ kt_url }}" target="_blank" rel="noopener">View in KT</a>
+  </div>
+</div>
+
+<div id="streams"><p class="muted">Загрузка…</p></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(function () { Editor.init({{ campaign.id }}); });
+</script>
+{% endblock %}
