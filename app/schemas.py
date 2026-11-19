@@ -39,6 +39,7 @@ class StreamOfferOut(BaseModel):
     offer_name: str
     share: int
     pinned: bool
+    disabled: bool
     state: str
     is_dirty: bool
 
@@ -46,7 +47,7 @@ class StreamOfferOut(BaseModel):
     def of(cls, o: StreamOffer) -> "StreamOfferOut":
         return cls(
             offer_id=o.offer_id, offer_name=o.offer_name, share=o.share,
-            pinned=o.pinned, state=o.state.value, is_dirty=o.is_dirty,
+            pinned=o.pinned, disabled=o.disabled, state=o.state.value, is_dirty=o.is_dirty,
         )
 
 

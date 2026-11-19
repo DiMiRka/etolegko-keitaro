@@ -120,6 +120,7 @@ input.geo { text-transform: uppercase; max-width: 160px; }
 
 .offers tr.removed td { color: var(--removed); background: var(--removed-bg); }
 .offers tr.removed .offer-name { text-decoration: line-through; }
+.offers tr.disabled td { color: var(--muted); font-style: italic; }
 .offers tr.changed .share-value { font-weight: 600; }
 .offer-name { font-weight: 500; }
 

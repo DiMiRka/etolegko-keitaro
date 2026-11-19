@@ -1,16 +1,15 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import router as api_router
 from app.config import get_settings
 from app.db import make_engine, make_sessionmaker
-from app.deps import get_session
+from app.deps import SessionDep
 from app.errors import AppError, NotFound
 from app.keitaro import KeitaroClient, KeitaroError
 from app.offers import OfferCatalog
@@ -51,6 +50,6 @@ async def keitaro_error_handler(request: Request, exc: KeitaroError):
 
 
 @app.get("/health")
-async def health(session: AsyncSession = Depends(get_session)) -> dict:
+async def health(session: SessionDep) -> dict:
     await session.execute(text("SELECT 1"))
     return {"status": "ok"}

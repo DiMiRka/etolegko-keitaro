@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
+from typing import Annotated
 
-from fastapi import Request
+from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
@@ -23,3 +24,9 @@ def get_catalog(request: Request) -> OfferCatalog:
 
 def settings_dep() -> Settings:
     return get_settings()
+
+
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
+KeitaroDep = Annotated[KeitaroClient, Depends(get_keitaro)]
+CatalogDep = Annotated[OfferCatalog, Depends(get_catalog)]
+SettingsDep = Annotated[Settings, Depends(settings_dep)]

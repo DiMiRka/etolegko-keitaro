@@ -7,7 +7,7 @@ from tests.test_streams import CAMPAIGN_KT_ID, OFFER_STREAM_ID, FakeKeitaro
 
 class EditorKeitaro(FakeKeitaro):
     async def get_campaign(self, campaign_id):
-        if campaign_id == CAMPAIGN_KT_ID:
+        if campaign_id == CAMPAIGN_KT_ID and not self.campaign_gone:
             return {"id": campaign_id, "name": "test_mironov_editor", "alias": "e"}
         raise KeitaroError("Keitaro HTTP 404: not found", 404)
 
@@ -83,6 +83,17 @@ class EditorApiTest(ApiCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn(f"/admin/#!/campaign/{CAMPAIGN_KT_ID}", r.text)
         self.assertEqual(self.client.get("/campaigns/999").status_code, 404)
+
+    def test_forget_campaign(self):
+        r = self.client.delete(f"/api/campaigns/{self.campaign_id}")
+        self.assertEqual(r.status_code, 204)
+        self.assertEqual(self.ok("GET", "/api/campaigns"), [])
+        self.ok("DELETE", f"/api/campaigns/{self.campaign_id}", 404)
+
+    def test_fetch_of_gone_campaign_is_400(self):
+        self.kt.campaign_gone = True
+        r = self.ok("POST", f"/api/campaigns/{self.campaign_id}/fetch", 400)
+        self.assertIn("больше нет в Keitaro", r["detail"])
 
     def test_import_unknown_campaign(self):
         self.ok("POST", "/api/campaigns/import", 404, json={"keitaro_id": 1})

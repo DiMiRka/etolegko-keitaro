@@ -56,23 +56,28 @@ var Editor = (function () {
 
   function offerRow(s, o) {
     var removed = o.state === 'removed';
-    var $tr = $('<tr>').toggleClass('removed', removed).toggleClass('changed', o.is_dirty && !removed);
+    var locked = removed || o.disabled;
+    var $tr = $('<tr>')
+      .toggleClass('removed', removed)
+      .toggleClass('disabled', o.disabled && !removed)
+      .toggleClass('changed', o.is_dirty && !removed);
 
+    var note = removed ? ' · archived' : (o.disabled ? ' · disabled in KT' : '');
     $('<td>')
       .append($('<div class="offer-name">').text(o.offer_name || ('Offer ' + o.offer_id)))
-      .append($('<div class="muted small">').text('ID ' + o.offer_id + (removed ? ' · archived' : '')))
+      .append($('<div class="muted small">').text('ID ' + o.offer_id + note))
       .appendTo($tr);
 
     var $share = $('<td class="share">');
     var $value = $('<span class="share-value">').text(o.share + '%');
-    if (!removed) {
+    if (!locked) {
       $value.attr('title', 'Нажмите, чтобы задать и закрепить долю').addClass('editable');
       $value.on('click', function () { editShare(s, o, $share); });
     }
     var $pin = $('<button class="pin" type="button">').html(PIN)
       .toggleClass('on', o.pinned)
       .attr('title', o.pinned ? 'Открепить долю' : 'Закрепить долю')
-      .prop('disabled', removed)
+      .prop('disabled', locked)
       .on('click', function () {
         act($pin, s, '/offers/' + o.offer_id + '/pin', {pinned: !o.pinned});
       });
@@ -142,7 +147,9 @@ var Editor = (function () {
     if (!s.offers.length) $tbody.append('<tr><td colspan="3" class="muted">Офферов нет</td></tr>');
     $card.append($table);
 
-    var total = s.offers.reduce(function (sum, o) { return sum + (o.state === 'active' ? o.share : 0); }, 0);
+    var total = s.offers.reduce(function (sum, o) {
+      return sum + (o.state === 'active' && !o.disabled ? o.share : 0);
+    }, 0);
     $card.append($('<div class="muted small total">').text('Сумма активных: ' + total + '%'));
 
     var $select = $('<select class="offer-select"></select>');
@@ -185,6 +192,12 @@ var Editor = (function () {
       App.busy($(this), App.api('POST', '/api/campaigns/' + campaignId + '/fetch')).done(function (c) {
         renderAll(c);
         App.toast('Потоки обновлены из Keitaro');
+      });
+    });
+    $('#forget').on('click', function () {
+      if (!confirm('Убрать кампанию из списка? В Keitaro она останется как есть')) return;
+      App.busy($(this), App.api('DELETE', '/api/campaigns/' + campaignId)).done(function () {
+        window.location = '/';
       });
     });
   }

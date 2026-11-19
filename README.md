@@ -40,6 +40,8 @@ uvicorn app.main:app --reload
 docker compose up -d db
 ```
 
+Если порт 5432 уже занят, задайте другой через `POSTGRES_PORT` (например `$env:POSTGRES_PORT=5433`, в Linux/macOS `POSTGRES_PORT=5433 docker compose up -d db`) и укажите тот же порт в `DATABASE_URL`.
+
 В `.env` замените строку подключения:
 
 ```env

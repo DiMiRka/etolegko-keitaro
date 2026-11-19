@@ -63,17 +63,21 @@ $(function () {
 
   $('#create-form').on('submit', function (e) {
     e.preventDefault();
-    var f = this;
-    var body = {name: f.name.value, geo: f.geo.value, offer_id: Number($(f.offer_id).val())};
+    var $f = $(this);
+    var body = {
+      name: $f.find('[name=name]').val(),
+      geo: $f.find('[name=geo]').val(),
+      offer_id: Number($f.find('[name=offer_id]').val())
+    };
     if (!body.offer_id) { App.toast('Выберите оффер', true); return; }
-    App.busy($(f).find('button'), App.api('POST', '/api/campaigns', body)).done(function (c) {
+    App.busy($f.find('button'), App.api('POST', '/api/campaigns', body)).done(function (c) {
       window.location = '/campaigns/' + c.id;
     });
   });
 
   $('#import-form').on('submit', function (e) {
     e.preventDefault();
-    var body = {keitaro_id: Number(this.keitaro_id.value)};
+    var body = {keitaro_id: Number($(this).find('[name=keitaro_id]').val())};
     App.busy($(this).find('button'), App.api('POST', '/api/campaigns/import', body)).done(function (c) {
       window.location = '/campaigns/' + c.id;
     });

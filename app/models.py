@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import Enum, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import Enum, ForeignKey, String, Text, UniqueConstraint, false, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -63,6 +63,7 @@ class StreamOffer(Base):
     offer_name: Mapped[str] = mapped_column(String(500), default="")
     share: Mapped[int] = mapped_column(default=0)
     pinned: Mapped[bool] = mapped_column(default=False)
+    disabled: Mapped[bool] = mapped_column(default=False, server_default=false())
     state: Mapped[OfferState] = mapped_column(_enum(OfferState), default=OfferState.active)
     published_share: Mapped[int | None]
     published_state: Mapped[OfferState | None] = mapped_column(_enum(OfferState))

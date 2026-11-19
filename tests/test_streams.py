@@ -31,9 +31,12 @@ class FakeKeitaro:
             },
         }
         self.fail_update = False
+        self.campaign_gone = False
         self.updates = []
 
     async def get_campaign(self, campaign_id):
+        if self.campaign_gone:
+            raise KeitaroError("Keitaro HTTP 404: not found", 404)
         return {"id": campaign_id, "name": "test_mironov_x", "alias": "x"}
 
     async def list_streams(self, campaign_id):
@@ -226,6 +229,61 @@ class StreamServiceTest(unittest.IsolatedAsyncioTestCase):
     async def test_cannot_add_offer_to_redirect_stream(self):
         with self.assertRaises(svc.StreamError):
             await svc.add_offer(self.session, self.stream(GEO_STREAM_ID), 4)
+
+    async def test_fetch_of_campaign_gone_from_keitaro(self):
+        self.kt.campaign_gone = True
+        with self.assertRaises(svc.StreamError) as ctx:
+            await self.refetch()
+        self.assertIn("больше нет в Keitaro", str(ctx.exception))
+
+    async def test_disabled_offer_is_kept_as_is(self):
+        self.kt.streams[OFFER_STREAM_ID]["offers"] = [
+            {"offer_id": 1, "share": 50, "state": "active"},
+            {"offer_id": 2, "share": 50, "state": "active"},
+            {"offer_id": 3, "share": 20, "state": "disabled"},
+        ]
+        await self.refetch()
+        self.assertTrue(self.offer(3).disabled)
+        self.assertFalse(self.stream().is_dirty)
+
+        await svc.add_offer(self.session, self.stream(), 4)
+        self.assertEqual(self.shares(), {1: 34, 2: 33, 3: 20, 4: 33})
+        with self.assertRaises(svc.StreamError):
+            await svc.set_pin(self.session, self.stream(), self.offer(3), True)
+
+        await svc.push(self.session, self.kt, self.stream())
+        sent = {o["offer_id"]: (o["share"], o["state"]) for o in self.kt.updates[-1][1]["offers"]}
+        self.assertEqual(sent, {1: (34, "active"), 2: (33, "active"), 3: (20, "disabled"), 4: (33, "active")})
+
+    async def test_removing_disabled_offer_drops_it_on_push(self):
+        self.kt.streams[OFFER_STREAM_ID]["offers"][2]["state"] = "disabled"
+        await self.refetch()
+        await svc.remove_offer(self.session, self.stream(), self.offer(3))
+        self.assertEqual(self.shares(), {1: 50, 2: 50, 3: 0})
+        await svc.push(self.session, self.kt, self.stream())
+        self.assertEqual(self.kt.kt_offers(), {1: 50, 2: 50})
+
+    async def test_empty_landings_stream_accepts_offers(self):
+        self.kt.streams[12] = {"id": 12, "name": "Empty", "position": 3, "schema": "landings", "offers": []}
+        await self.refetch()
+        empty = self.stream(12)
+        self.assertTrue(empty.has_offers)
+        await svc.add_offer(self.session, empty, 5)
+        self.assertEqual(self.shares(12), {5: 100})
+
+    async def test_failed_remove_keeps_order(self):
+        await svc.add_offer(self.session, self.stream(), 4)
+        await svc.set_pin(self.session, self.stream(), self.offer(1), True, 40)
+        await svc.set_pin(self.session, self.stream(), self.offer(2), True, 30)
+        await svc.set_pin(self.session, self.stream(), self.offer(3), True, 20)
+        with self.assertRaises(svc.StreamError):
+            await svc.remove_offer(self.session, self.stream(), self.offer(4))
+        self.assertEqual([o.offer_id for o in self.stream().offers], [1, 2, 3, 4])
+
+    async def test_forget_campaign(self):
+        await svc.forget_campaign(self.session, self.campaign)
+        with self.assertRaises(svc.NotFound):
+            await svc.load_campaign(self.session, self.campaign.id)
 
     async def test_import_is_idempotent(self):
         again = await svc.import_campaign(self.session, self.kt, CAMPAIGN_KT_ID)

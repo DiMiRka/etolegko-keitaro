@@ -53,5 +53,5 @@ class _Weighted(Protocol):
 
 def rebalance(offers: Sequence[_Weighted]) -> None:
     shares = compute_shares([Entry(o.share, o.pinned, o.is_active) for o in offers])
-    for o, share in zip(offers, shares):
+    for o, share in zip(offers, shares, strict=True):
         o.share = share
