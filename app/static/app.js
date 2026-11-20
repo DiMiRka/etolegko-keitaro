@@ -219,11 +219,11 @@ var Stats = (function () {
     }
   }
 
-  function load(campaignId) {
+  function load(url, onData) {
     var $btn = $('#stats-refresh');
-    return App.busy($btn, App.api('GET', '/api/campaigns/' + campaignId + '/stats')).done(function (data) {
+    return App.busy($btn, App.api('GET', url)).done(function (data) {
       render(data);
-      Editor.setStats(data);
+      if (onData) onData(data);
     }).fail(function () {
       $('#stats').html('<p class="muted">Статистику получить не удалось</p>');
     });
@@ -323,7 +323,9 @@ var Editor = (function () {
 
     var note = removed ? ' · в архиве' : (o.disabled ? ' · отключён в Keitaro' : '');
     $('<td>')
-      .append($('<div class="offer-name">').text(o.offer_name || ('Оффер ' + o.offer_id)))
+      .append($('<div class="offer-name">').append(
+        $('<a>').attr('href', '/offers/' + o.offer_id).text(o.offer_name || ('Оффер ' + o.offer_id))
+      ))
       .append($('<div class="muted small">').text('ID ' + o.offer_id + note))
       .appendTo($tr);
 
@@ -471,6 +473,94 @@ var Editor = (function () {
   return {renderAll: renderAll, setStats: setStats};
 })();
 
+var OfferList = (function () {
+  var rows = [];
+
+  function payout(o) {
+    return o.payout_type + ' · ' + App.num(o.payout_value) + ' ' + o.payout_currency;
+  }
+
+  function render(filter) {
+    var q = $.trim(filter || '').toLowerCase();
+    var $tb = $('#offers tbody').empty();
+    var shown = rows.filter(function (o) {
+      return !q || o.name.toLowerCase().indexOf(q) >= 0 || String(o.id).indexOf(q) === 0 ||
+        o.group.toLowerCase().indexOf(q) >= 0;
+    });
+    if (!shown.length) {
+      $tb.append($('<tr><td colspan="7" class="muted"></td></tr>').find('td')
+        .text(rows.length ? 'Ничего не найдено' : 'Ключу не доступен ни один оффер').end());
+    }
+    shown.forEach(function (o) {
+      var href = '/offers/' + o.id;
+      $('<tr>').toggleClass('muted', o.state !== 'active')
+        .append($('<td class="num">').text(o.id))
+        .append($('<td>').append($('<a>').attr('href', href).text(o.name)))
+        .append($('<td>').text(o.group || '—'))
+        .append($('<td>').text(o.countries.join(', ') || '—'))
+        .append($('<td class="num">').text(payout(o)))
+        .append($('<td class="right num">').text(o.clicks_7d === null ? '—' : App.num(o.clicks_7d)))
+        .append($('<td class="right num">').text(o.campaigns_count))
+        .on('click', function (e) { if (!$(e.target).is('a')) window.location = href; })
+        .appendTo($tb);
+    });
+  }
+
+  function init() {
+    App.api('GET', '/api/offers/catalog').done(function (data) {
+      rows = data;
+      render($('#offer-filter').val());
+    });
+    $('#offer-filter').on('input', function () { render(this.value); });
+  }
+
+  return {init: init};
+})();
+
+var OfferCard = (function () {
+  var STATES = {active: 'активен', removed: 'в архиве'};
+
+  function usage(rows) {
+    var $tb = $('#usage tbody').empty();
+    if (!rows.length) {
+      $tb.append('<tr><td colspan="4" class="muted">Оффер не используется в потоках кампаний из списка</td></tr>');
+    }
+    rows.forEach(function (r) {
+      var status = r.disabled ? 'отключён в Keitaro' : STATES[r.state];
+      if (r.is_dirty) status += ', не опубликовано';
+      $('<tr>').toggleClass('removed', r.state === 'removed')
+        .append($('<td>').append($('<a>').attr('href', '/campaigns/' + r.campaign_id).text(r.campaign_name)))
+        .append($('<td>').text(r.stream_name + ' (stream_id ' + r.stream_keitaro_id + ')'))
+        .append($('<td class="num">').text(r.share + '%' + (r.pinned ? ' · закреплено' : '')))
+        .append($('<td>').text(status))
+        .appendTo($tb);
+    });
+  }
+
+  function campaigns(data) {
+    var $root = $('#stats-campaigns').empty();
+    if (!data.campaigns.length) return;
+    var $t = $('<table class="table compact"><thead><tr><th>Кампания в Keitaro</th>' +
+      '<th class="right">Клики</th><th class="right">Конверсии</th></tr></thead><tbody></tbody></table>');
+    data.campaigns.slice(0, 10).forEach(function (c) {
+      $t.find('tbody').append($('<tr>')
+        .append($('<td>').text(c.name + ' (#' + c.keitaro_id + ')'))
+        .append($('<td class="right num">').text(App.num(c.clicks)))
+        .append($('<td class="right num">').text(App.num(c.conversions))));
+    });
+    $root.append($('<div class="chart-title spaced">').text('Кампании с наибольшим числом кликов'), $t);
+  }
+
+  function init(id) {
+    var url = '/api/offers/' + id + '/stats';
+    App.api('GET', '/api/offers/' + id).done(function (o) { usage(o.usage); });
+    Stats.load(url, campaigns);
+    $('#stats-refresh').on('click', function () { Stats.load(url, campaigns); });
+  }
+
+  return {init: init};
+})();
+
 var CampaignCard = (function () {
   var campaignId;
   var saved = {};
@@ -509,11 +599,12 @@ var CampaignCard = (function () {
 
   function init(id) {
     campaignId = id;
+    var statsUrl = '/api/campaigns/' + id + '/stats';
     App.api('GET', '/api/campaigns/' + id).done(function (c) {
       showCampaign(c);
-      Stats.load(id);
+      Stats.load(statsUrl, Editor.setStats);
     });
-    $('#stats-refresh').on('click', function () { Stats.load(campaignId); });
+    $('#stats-refresh').on('click', function () { Stats.load(statsUrl, Editor.setStats); });
 
     var $f = $('#main-form');
     App.api('GET', '/api/references').done(function (data) {

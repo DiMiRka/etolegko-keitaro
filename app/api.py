@@ -7,8 +7,10 @@ from app import campaigns, stats
 from app import streams as svc
 from app.campaigns import Tracking
 from app.deps import CatalogDep, KeitaroDep, ReferencesDep, SessionDep, SettingsDep
-from app.errors import AppError
+from app.errors import AppError, NotFound
+from app.keitaro import KeitaroError
 from app.models import Campaign
+from app.offers import offer_usage
 from app.schemas import (
     CampaignCreate,
     CampaignImport,
@@ -33,6 +35,42 @@ async def search_offers(catalog: CatalogDep, q: str = ""):
 async def list_campaigns(session: SessionDep):
     rows = await session.scalars(select(Campaign).order_by(Campaign.id.desc()))
     return [CampaignShort(id=c.id, keitaro_id=c.keitaro_id, name=c.name, geo=c.geo) for c in rows]
+
+
+@router.get("/offers/catalog")
+async def offers_catalog(session: SessionDep, kt: KeitaroDep, catalog: CatalogDep, settings: SettingsDep):
+    offers = await catalog.all()
+    try:
+        clicks = await stats.clicks_by_offer(kt, 7, settings.keitaro_timezone)
+    except KeitaroError:
+        clicks = None
+    usage: dict[int, set[int]] = {}
+    for row in await offer_usage(session):
+        if row["state"] == "active":
+            usage.setdefault(row["offer_id"], set()).add(row["campaign_id"])
+    return [
+        {**o, "clicks_7d": None if clicks is None else clicks.get(o["id"], 0),
+         "campaigns_count": len(usage.get(o["id"], ()))}
+        for o in offers
+    ]
+
+
+@router.get("/offers/{offer_id}")
+async def offer_detail(offer_id: int, session: SessionDep, catalog: CatalogDep):
+    offer = await catalog.get(offer_id)
+    if offer is None:
+        raise NotFound(f"Оффер {offer_id} не найден в Keitaro")
+    return {**offer, "usage": await offer_usage(session, offer_id)}
+
+
+@router.get("/offers/{offer_id}/stats")
+async def offer_stats(
+    offer_id: int, kt: KeitaroDep, catalog: CatalogDep, settings: SettingsDep,
+    days: Annotated[int, Query(ge=1, le=90)] = 7,
+):
+    if await catalog.get(offer_id) is None:
+        raise NotFound(f"Оффер {offer_id} не найден в Keitaro")
+    return await stats.offer_stats(kt, offer_id, days, settings.keitaro_timezone)
 
 
 @router.get("/references")

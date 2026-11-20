@@ -5,7 +5,8 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app import streams as svc
-from app.deps import SessionDep, SettingsDep
+from app.deps import CatalogDep, SessionDep, SettingsDep
+from app.errors import NotFound
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.globals["asset_version"] = max(
@@ -29,6 +30,19 @@ async def new_campaign_page(request: Request, settings: SettingsDep):
     return templates.TemplateResponse(
         request, "campaign_new.html", {"nav": "campaigns", "prefix": settings.campaign_prefix}
     )
+
+
+@router.get("/offers")
+async def offers_page(request: Request):
+    return templates.TemplateResponse(request, "offers.html", {"nav": "offers"})
+
+
+@router.get("/offers/{offer_id}")
+async def offer_page(request: Request, offer_id: int, catalog: CatalogDep):
+    offer = await catalog.get(offer_id)
+    if offer is None:
+        raise NotFound(f"Оффер {offer_id} не найден в Keitaro")
+    return templates.TemplateResponse(request, "offer.html", {"nav": "offers", "offer": offer})
 
 
 @router.get("/campaigns/{campaign_id}")

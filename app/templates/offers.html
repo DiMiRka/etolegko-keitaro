@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Офферы · Keitaro wrapper{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Офферы</h1>
+  <input type="search" id="offer-filter" class="search" placeholder="Поиск по названию, ID или группе" autocomplete="off">
+</div>
+
+<p class="muted small notice">Офферы берутся из Keitaro. Создавать и редактировать их через API-ключ нельзя: у ключа есть права только на чтение офферов.</p>
+
+<section class="card flush">
+  <div class="table-wrap">
+    <table class="table clickable" id="offers">
+      <thead><tr>
+        <th>ID</th><th>Название</th><th>Группа</th><th>Страны</th><th>Выплата</th>
+        <th class="right">Клики, 7 дн.</th><th class="right" title="Сколько кампаний из раздела «Кампании» используют оффер">В кампаниях</th>
+      </tr></thead>
+      <tbody><tr><td colspan="7" class="muted">Загрузка…</td></tr></tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>$(function () { OfferList.init(); });</script>
+{% endblock %}

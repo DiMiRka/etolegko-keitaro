@@ -65,6 +65,46 @@ def aggregate(rows: list[dict], days: list[str]) -> dict:
     return {"days": days, "total": _finish(total), "streams": streams}
 
 
+def aggregate_offer(rows: list[dict], days: list[str]) -> dict:
+    index = {d: i for i, d in enumerate(days)}
+    total = _bucket(len(days))
+    campaigns: dict[int, dict] = {}
+    for row in rows:
+        i = index.get(str(row.get("day")))
+        if i is None:
+            continue
+        _add(total, row, i)
+        campaign_id = int(row.get("campaign_id") or 0)
+        c = campaigns.setdefault(
+            campaign_id, {"keitaro_id": campaign_id, "name": row.get("campaign") or "", **_bucket(len(days))}
+        )
+        _add(c, row, i)
+    ranked = sorted((_finish(c) for c in campaigns.values()), key=lambda c: (-c["clicks"], c["keitaro_id"]))
+    return {"days": days, "total": _finish(total), "campaigns": ranked}
+
+
+async def offer_stats(kt: KeitaroClient, offer_id: int, days: int, timezone: str) -> dict:
+    day_list = day_range(days, timezone)
+    report = await kt.build_report({
+        "range": {"from": day_list[0], "to": day_list[-1], "timezone": timezone},
+        "dimensions": ["campaign_id", "campaign", "day"],
+        "measures": MEASURES,
+        "filters": [{"name": "offer_id", "operator": "EQUALS", "expression": offer_id}],
+    })
+    return aggregate_offer(report.get("rows") or [], day_list)
+
+
+async def clicks_by_offer(kt: KeitaroClient, days: int, timezone: str) -> dict[int, int]:
+    day_list = day_range(days, timezone)
+    report = await kt.build_report({
+        "range": {"from": day_list[0], "to": day_list[-1], "timezone": timezone},
+        "dimensions": ["offer_id"],
+        "measures": ["clicks"],
+        "filters": [{"name": "offer_id", "operator": "GREATER_THAN", "expression": 0}],
+    })
+    return {int(r["offer_id"]): int(r.get("clicks") or 0) for r in report.get("rows") or []}
+
+
 async def campaign_stats(kt: KeitaroClient, keitaro_id: int, days: int, timezone: str) -> dict:
     day_list = day_range(days, timezone)
     report = await kt.build_report(report_body(keitaro_id, day_list, timezone))

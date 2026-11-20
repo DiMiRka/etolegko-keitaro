@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ offer.name }} · Keitaro wrapper{% endblock %}
+{% block content %}
+<nav class="crumbs"><a href="/offers">Офферы</a> / <span>{{ offer.name }}</span></nav>
+
+<div class="page-head">
+  <h1>{{ offer.name }}</h1>
+  {% if offer.state != 'active' %}<span class="badge">{{ offer.state }}</span>{% endif %}
+</div>
+
+<section class="card">
+  <h2>Основное</h2>
+  <dl class="props">
+    <dt>ID в Keitaro</dt><dd>{{ offer.id }}</dd>
+    <dt>Группа</dt><dd>{{ offer.group or '—' }}</dd>
+    <dt>Страны</dt><dd>{{ offer.countries | join(', ') or '—' }}</dd>
+    <dt>Выплата</dt>
+    <dd>{{ offer.payout_type }} · {{ offer.payout_value }} {{ offer.payout_currency }}{% if offer.payout_auto %} · из постбэка{% endif %}</dd>
+    <dt>Тип</dt><dd>{{ offer.offer_type or '—' }}{% if offer.action_type %} · {{ offer.action_type }}{% endif %}</dd>
+    <dt>Создан</dt><dd>{{ offer.created_at or '—' }}</dd>
+    {% if offer.notes %}<dt>Заметки</dt><dd>{{ offer.notes }}</dd>{% endif %}
+  </dl>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2 id="stats-title">Статистика</h2>
+    <button class="btn small" id="stats-refresh">Обновить</button>
+  </div>
+  <p class="muted small">По всему трекеру, во всех кампаниях, где оффер получал трафик</p>
+  <div id="stats"><p class="muted">Загрузка…</p></div>
+  <div id="stats-campaigns"></div>
+</section>
+
+<section class="card">
+  <h2>Используется в потоках</h2>
+  <p class="muted small">Среди кампаний из раздела «Кампании»</p>
+  <div class="table-wrap">
+    <table class="table" id="usage">
+      <thead><tr><th>Кампания</th><th>Поток</th><th>Доля</th><th>Статус</th></tr></thead>
+      <tbody><tr><td colspan="4" class="muted">Загрузка…</td></tr></tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>$(function () { OfferCard.init({{ offer.id }}); });</script>
+{% endblock %}

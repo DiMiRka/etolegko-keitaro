@@ -146,6 +146,13 @@ input.geo { text-transform: uppercase; max-width: 160px; }
 .meta .muted { margin-right: 4px; }
 @media (max-width: 760px) { .grid-form { grid-template-columns: minmax(0, 1fr); } }
 
+.search { width: min(320px, 100%); }
+.notice { margin: -8px 0 12px; }
+.props { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 24px; margin: 0; }
+.props dt { color: var(--muted); }
+.props dd { margin: 0; overflow-wrap: anywhere; }
+.chart-title.spaced { margin-top: 16px; }
+#usage tr.removed td { color: var(--removed); }
 .inline-form { display: flex; gap: 8px; flex-wrap: wrap; }
 .inline-form input { flex: 1; min-width: 0; max-width: 320px; }
 
@@ -248,6 +255,8 @@ input.geo { text-transform: uppercase; max-width: 160px; }
 .offers tr.disabled td { color: var(--muted); font-style: italic; }
 .offers tr.changed .share-value { font-weight: 600; }
 .offer-name { font-weight: 500; }
+.offer-name a { color: inherit; }
+.offer-name a:hover { color: var(--primary); }
 
 .share { white-space: nowrap; width: 140px; }
 .share-value { display: inline-block; min-width: 42px; }
