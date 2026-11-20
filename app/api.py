@@ -16,6 +16,7 @@ from app.schemas import (
     CampaignImport,
     CampaignOut,
     CampaignShort,
+    CampaignState,
     CampaignUpdate,
     OfferAdd,
     OfferOut,
@@ -34,7 +35,19 @@ async def search_offers(catalog: CatalogDep, q: str = ""):
 @router.get("/campaigns", response_model=list[CampaignShort])
 async def list_campaigns(session: SessionDep):
     rows = await session.scalars(select(Campaign).order_by(Campaign.id.desc()))
-    return [CampaignShort(id=c.id, keitaro_id=c.keitaro_id, name=c.name, geo=c.geo) for c in rows]
+    return [CampaignShort.of(c) for c in rows]
+
+
+@router.get("/campaigns/stats")
+async def campaigns_stats(
+    session: SessionDep, kt: KeitaroDep, settings: SettingsDep,
+    days: Annotated[int, Query(ge=1, le=90)] = 7,
+):
+    ids = list(await session.scalars(select(Campaign.keitaro_id)))
+    return {
+        "days": days,
+        "campaigns": await stats.campaigns_totals(kt, ids, days, settings.keitaro_timezone),
+    }
 
 
 @router.get("/offers/catalog")
@@ -135,6 +148,12 @@ async def update_campaign(
         body.domain_id, body.group_id, body.traffic_source_id,
     )
     return CampaignOut.of(updated)
+
+
+@router.post("/campaigns/{campaign_id}/state", response_model=CampaignOut)
+async def set_campaign_state(campaign_id: int, body: CampaignState, session: SessionDep, kt: KeitaroDep):
+    campaign = await svc.load_campaign(session, campaign_id)
+    return CampaignOut.of(await campaigns.set_state(session, kt, campaign, body.active))
 
 
 @router.delete("/campaigns/{campaign_id}", status_code=204)

@@ -105,6 +105,24 @@ async def clicks_by_offer(kt: KeitaroClient, days: int, timezone: str) -> dict[i
     return {int(r["offer_id"]): int(r.get("clicks") or 0) for r in report.get("rows") or []}
 
 
+async def campaigns_totals(kt: KeitaroClient, keitaro_ids: list[int], days: int, timezone: str) -> dict[int, dict]:
+    if not keitaro_ids:
+        return {}
+    day_list = day_range(days, timezone)
+    report = await kt.build_report({
+        "range": {"from": day_list[0], "to": day_list[-1], "timezone": timezone},
+        "dimensions": ["campaign_id"],
+        "measures": MEASURES,
+        "filters": [{"name": "campaign_id", "operator": "IN_LIST", "expression": keitaro_ids}],
+    })
+    result = {}
+    for row in report.get("rows") or []:
+        bucket = _bucket(1)
+        _add(bucket, row, 0)
+        result[int(row["campaign_id"])] = {k: v for k, v in _finish(bucket).items() if k not in ("by_day", "today")}
+    return result
+
+
 async def campaign_stats(kt: KeitaroClient, keitaro_id: int, days: int, timezone: str) -> dict:
     day_list = day_range(days, timezone)
     report = await kt.build_report(report_body(keitaro_id, day_list, timezone))

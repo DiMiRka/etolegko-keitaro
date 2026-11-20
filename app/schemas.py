@@ -20,6 +20,10 @@ class CampaignUpdate(BaseModel):
     traffic_source_id: int | None = None
 
 
+class CampaignState(BaseModel):
+    active: bool
+
+
 class CampaignImport(BaseModel):
     keitaro_id: int
 
@@ -38,6 +42,16 @@ class CampaignShort(BaseModel):
     keitaro_id: int
     name: str
     geo: str | None
+    group_id: int | None
+    state: str | None
+    url: str | None
+
+    @classmethod
+    def of(cls, c: Campaign) -> "CampaignShort":
+        return cls(
+            id=c.id, keitaro_id=c.keitaro_id, name=c.name, geo=c.geo,
+            group_id=c.group_id, state=c.state, url=c.url,
+        )
 
 
 class OfferOut(BaseModel):
@@ -90,6 +104,8 @@ class CampaignOut(BaseModel):
     domain_id: int | None
     group_id: int | None
     traffic_source_id: int | None
+    state: str | None
+    url: str | None
     streams: list[StreamOut]
 
     @classmethod
@@ -97,5 +113,5 @@ class CampaignOut(BaseModel):
         return cls(
             id=c.id, keitaro_id=c.keitaro_id, name=c.name, alias=c.alias, geo=c.geo,
             domain_id=c.domain_id, group_id=c.group_id, traffic_source_id=c.traffic_source_id,
-            streams=[StreamOut.of(s) for s in c.streams],
+            state=c.state, url=c.url, streams=[StreamOut.of(s) for s in c.streams],
         )

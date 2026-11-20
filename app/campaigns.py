@@ -9,7 +9,7 @@ from app.errors import AppError
 from app.keitaro import KeitaroClient, KeitaroError
 from app.models import Campaign
 from app.offers import OfferCatalog
-from app.streams import fetch_streams, load_campaign
+from app.streams import apply_campaign_info, fetch_streams, load_campaign
 
 GEO_RE = re.compile(r"^[A-Z]{2}$")
 
@@ -130,6 +130,16 @@ async def create_campaign(
     await session.commit()
     campaign = await load_campaign(session, campaign.id)
     return await fetch_streams(session, kt, campaign)
+
+
+async def set_state(session: AsyncSession, kt: KeitaroClient, campaign: Campaign, active: bool) -> Campaign:
+    if active:
+        await kt.enable_campaign(campaign.keitaro_id)
+    else:
+        await kt.disable_campaign(campaign.keitaro_id)
+    apply_campaign_info(campaign, await kt.get_campaign(campaign.keitaro_id))
+    await session.commit()
+    return await load_campaign(session, campaign.id)
 
 
 def country_filter(stream: dict) -> dict | None:

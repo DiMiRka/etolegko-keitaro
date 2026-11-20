@@ -18,6 +18,8 @@ class FakeKeitaro:
         self.deleted: list[int] = []
         self.offer_calls = 0
         self.reference_calls = 0
+        self.state_calls = []
+        self.reports = []
         self.fail_stream_n = fail_stream_n
         self.fail_delete = fail_delete
 
@@ -66,6 +68,21 @@ class FakeKeitaro:
 
     async def list_streams(self, campaign_id):
         return [s for s in self.streams if s["campaign_id"] == campaign_id]
+
+    async def enable_campaign(self, campaign_id):
+        self.state_calls.append((campaign_id, True))
+        self.campaigns[campaign_id]["state"] = "active"
+        return [self.campaigns[campaign_id]]
+
+    async def disable_campaign(self, campaign_id):
+        self.state_calls.append((campaign_id, False))
+        self.campaigns[campaign_id]["state"] = "disabled"
+        return [self.campaigns[campaign_id]]
+
+    async def build_report(self, body):
+        self.reports.append(body)
+        ids = body["filters"][0]["expression"]
+        return {"rows": [{"campaign_id": ids[0], "clicks": 9, "conversions": 1}]}
 
     async def update_campaign(self, campaign_id, payload):
         self.campaigns[campaign_id].update(payload)
@@ -215,6 +232,18 @@ class UpdateCampaignTest(DbCase):
         c = await campaigns.fetch_streams(self.session, self.kt, self.campaign)
         self.assertEqual((c.domain_id, c.group_id), (5, 7))
 
+    async def test_fetch_reads_state_and_url(self):
+        self.kt.campaigns[self.campaign.keitaro_id].update(state="active", domain="https://kylovoa.com/")
+        c = await campaigns.fetch_streams(self.session, self.kt, self.campaign)
+        self.assertEqual(c.state, "active")
+        self.assertEqual(c.url, "https://kylovoa.com/" + c.alias)
+
+    async def test_set_state(self):
+        c = await campaigns.set_state(self.session, self.kt, self.campaign, False)
+        self.assertEqual((c.state, self.kt.state_calls), ("disabled", [(c.keitaro_id, False)]))
+        c = await campaigns.set_state(self.session, self.kt, self.campaign, True)
+        self.assertEqual(c.state, "active")
+
     async def test_fetch_derives_geo(self):
         self.campaign.geo = None
         await self.session.commit()
@@ -289,6 +318,21 @@ class CampaignApiTest(ApiCase):
         r = self.ok("PATCH", f"/api/campaigns/{body['id']}", 400, json={"group_id": 99})
         self.assertIn("Группа 99", r["detail"])
         self.assertEqual(self.kt.campaigns[body["keitaro_id"]]["group_id"], 7)
+
+    def test_state_and_list_stats(self):
+        created = self.ok("POST", "/api/campaigns", 201, json={"name": "s1", "geo": "AU", "offer_id": 18813})
+        off = self.ok("POST", f"/api/campaigns/{created['id']}/state", json={"active": False})
+        self.assertEqual(off["state"], "disabled")
+        listed = self.ok("GET", "/api/campaigns")[0]
+        self.assertEqual((listed["state"], listed["group_id"]), ("disabled", 2))
+        stats = self.ok("GET", "/api/campaigns/stats")
+        self.assertEqual(stats["campaigns"][str(created["keitaro_id"])]["clicks"], 9)
+        self.assertEqual(self.kt.reports[-1]["filters"][0]["operator"], "IN_LIST")
+        self.ok("POST", "/api/campaigns/999/state", 404, json={"active": True})
+
+    def test_list_stats_without_campaigns(self):
+        self.assertEqual(self.ok("GET", "/api/campaigns/stats")["campaigns"], {})
+        self.assertEqual(self.kt.reports, [])
 
     def test_references_endpoint(self):
         refs = self.ok("GET", "/api/references")

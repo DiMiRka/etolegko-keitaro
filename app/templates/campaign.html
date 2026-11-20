@@ -12,6 +12,20 @@
 </div>
 
 <section class="card">
+  <div class="campaign-bar">
+    <div class="state-field">
+      <span class="state-badge" id="state-badge">—</span>
+      <button class="btn small" id="toggle-state" hidden></button>
+    </div>
+    <div class="link-field">
+      <input id="campaign-url" readonly placeholder="Ссылка появится после загрузки потоков из Keitaro" aria-label="Ссылка кампании">
+      <button class="btn small" id="copy-url" type="button">Копировать</button>
+      <a class="btn small" id="open-url" target="_blank" rel="noopener" title="Открытие ссылки засчитывается в Keitaro как клик">Открыть</a>
+    </div>
+  </div>
+</section>
+
+<section class="card">
   <h2>Основное</h2>
   <form id="main-form" class="form grid-form">
     <label>Название

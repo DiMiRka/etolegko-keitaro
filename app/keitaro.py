@@ -81,6 +81,12 @@ class KeitaroClient:
     async def update_campaign(self, campaign_id: int, payload: dict) -> dict:
         return await self._request("PUT", f"/campaigns/{campaign_id}", json=payload)
 
+    async def enable_campaign(self, campaign_id: int) -> dict:
+        return await self._request("POST", f"/campaigns/{campaign_id}/enable")
+
+    async def disable_campaign(self, campaign_id: int) -> dict:
+        return await self._request("POST", f"/campaigns/{campaign_id}/disable")
+
     async def delete_campaign(self, campaign_id: int) -> None:
         await self._request("DELETE", f"/campaigns/{campaign_id}")
 

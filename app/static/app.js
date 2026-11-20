@@ -70,6 +70,24 @@ var App = (function () {
 
   function shortDay(iso) { return iso.slice(8, 10) + '.' + iso.slice(5, 7); }
 
+  var STATE_LABELS = {active: 'Включена', disabled: 'Выключена'};
+
+  function stateBadge(state) {
+    if (!state) return $('<span class="muted">').text('—');
+    return $('<span class="state-badge">').addClass('state-' + state).text(STATE_LABELS[state] || state);
+  }
+
+  function copy(text) {
+    var done = function () { toast('Ссылка скопирована'); };
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).then(done, function () { toast('Не удалось скопировать', true); });
+    }
+    var $t = $('<textarea>').val(text).css({position: 'fixed', opacity: 0}).appendTo('body');
+    $t[0].select();
+    try { document.execCommand('copy'); done(); } catch (e) { toast('Не удалось скопировать', true); }
+    $t.remove();
+  }
+
   var REFS = [['domain_id', 'domains'], ['group_id', 'groups'], ['traffic_source_id', 'traffic_sources']];
 
   function fillRefs($f, data) {
@@ -111,6 +129,7 @@ var App = (function () {
   return {
     toast: toast, api: api, busy: busy, offerSelect: offerSelect, field: field,
     num: num, plural: plural, clicks: clicks, shortDay: shortDay,
+    STATE_LABELS: STATE_LABELS, stateBadge: stateBadge, copy: copy,
     fillRefs: fillRefs, setRefs: setRefs, readRefs: readRefs
   };
 })();
@@ -233,26 +252,82 @@ var Stats = (function () {
 })();
 
 var CampaignList = (function () {
-  function load() {
-    App.api('GET', '/api/campaigns').done(function (rows) {
-      var $tb = $('#campaigns tbody').empty();
-      if (!rows.length) {
-        $tb.append('<tr><td colspan="3" class="muted">Пока пусто: создайте новую кампанию или подключите существующую</td></tr>');
-      }
-      rows.forEach(function (c) {
-        var href = '/campaigns/' + c.id;
-        $('<tr>')
-          .append($('<td>').append($('<a>').attr('href', href).text(c.name)))
-          .append($('<td>').text(c.geo || '—'))
-          .append($('<td>').text(c.keitaro_id))
-          .on('click', function (e) { if (!$(e.target).is('a')) window.location = href; })
-          .appendTo($tb);
-      });
+  var LINK_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>';
+  var rows = null;
+  var groups = {};
+  var totals = null;
+
+  function statCell(c, key) {
+    if (totals === null) return $('<td class="right num muted">').text('…');
+    var t = totals[c.keitaro_id];
+    return $('<td class="right num">').text(App.num(t ? t[key] : 0));
+  }
+
+  function render() {
+    if (rows === null) return;
+    var q = $.trim($('#f-search').val()).toLowerCase();
+    var group = $('#f-group').val();
+    var state = $('#f-state').val();
+    var shown = rows.filter(function (c) {
+      return (!q || c.name.toLowerCase().indexOf(q) >= 0 || String(c.keitaro_id).indexOf(q) === 0) &&
+        (!group || String(c.group_id) === group) &&
+        (!state || c.state === state);
     });
+    var $tb = $('#campaigns tbody').empty();
+    if (!shown.length) {
+      $tb.append($('<tr><td colspan="8" class="muted"></td></tr>').find('td').text(rows.length
+        ? 'Ничего не найдено'
+        : 'Пока пусто: создайте новую кампанию или подключите существующую').end());
+    }
+    shown.forEach(function (c) {
+      var href = '/campaigns/' + c.id;
+      var $copy = $('<button class="icon-btn" type="button">').html(LINK_ICON)
+        .attr('title', c.url ? 'Скопировать ссылку ' + c.url : 'Ссылка появится после загрузки потоков')
+        .attr('aria-label', 'Скопировать ссылку кампании')
+        .prop('disabled', !c.url)
+        .on('click', function (e) { e.stopPropagation(); App.copy(c.url); });
+      $('<tr>')
+        .append($('<td>').append($('<a>').attr('href', href).text(c.name)))
+        .append($('<td>').append(App.stateBadge(c.state)))
+        .append($('<td>').text(c.geo || '—'))
+        .append($('<td>').text(c.group_id ? (groups[c.group_id] || '#' + c.group_id) : '—'))
+        .append(statCell(c, 'clicks'))
+        .append(statCell(c, 'conversions'))
+        .append($('<td class="right num">').text(c.keitaro_id))
+        .append($('<td class="right">').append($copy))
+        .on('click', function (e) { if (!$(e.target).closest('a, button').length) window.location = href; })
+        .appendTo($tb);
+    });
+  }
+
+  function fillGroups() {
+    if (rows === null) return;
+    var $sel = $('#f-group');
+    $sel.find('option:not(:first)').remove();
+    var used = {};
+    rows.forEach(function (c) { if (c.group_id) used[c.group_id] = groups[c.group_id] || '#' + c.group_id; });
+    Object.keys(used).sort(function (a, b) { return used[a].localeCompare(used[b]); }).forEach(function (id) {
+      $('<option>').val(id).text(used[id]).appendTo($sel);
+    });
+  }
+
+  function load() {
+    App.api('GET', '/api/campaigns').done(function (data) { rows = data; fillGroups(); render(); });
+    App.api('GET', '/api/references').done(function (refs) {
+      refs.groups.forEach(function (g) { groups[g.id] = g.name; });
+      fillGroups();
+      render();
+    });
+    $.ajax({url: '/api/campaigns/stats', dataType: 'json'})
+      .done(function (data) { totals = data.campaigns; })
+      .fail(function () { totals = {}; })
+      .always(render);
   }
 
   function init() {
     load();
+    $('#f-search').on('input', render);
+    $('#f-group, #f-state').on('change', render);
     $('#import-form').on('submit', function (e) {
       e.preventDefault();
       var $f = $(this);
@@ -577,6 +652,13 @@ var CampaignCard = (function () {
     if (refsLoaded) App.setRefs($f, saved);
     $('#title, #crumb-name').text(c.name);
     $('#alias').text(c.alias);
+    $('#state-badge').replaceWith(App.stateBadge(c.state).attr('id', 'state-badge'));
+    $('#toggle-state').prop('hidden', !c.state)
+      .text(c.state === 'active' ? 'Выключить' : 'Включить')
+      .data('active', c.state !== 'active');
+    $('#campaign-url').val(c.url || '');
+    $('#copy-url').prop('disabled', !c.url);
+    $('#open-url').attr('href', c.url || null).toggleClass('disabled', !c.url);
     document.title = c.name + ' · Keitaro wrapper';
     $f.find('button[type=submit]').prop('disabled', true);
     Editor.renderAll(c.streams);
@@ -633,6 +715,18 @@ var CampaignCard = (function () {
         App.toast('Потоки обновлены из Keitaro');
       });
     });
+
+    $('#toggle-state').on('click', function () {
+      var active = $(this).data('active');
+      if (!active && !confirm('Выключить кампанию? Keitaro перестанет обрабатывать по ней трафик')) return;
+      App.busy($(this), App.api('POST', '/api/campaigns/' + campaignId + '/state', {active: active}))
+        .done(function (c) {
+          showCampaign(c);
+          App.toast(active ? 'Кампания включена' : 'Кампания выключена');
+        });
+    });
+
+    $('#copy-url').on('click', function () { App.copy($('#campaign-url').val()); });
 
     $('#forget').on('click', function () {
       if (!confirm('Убрать кампанию из списка? В Keitaro она останется как есть')) return;

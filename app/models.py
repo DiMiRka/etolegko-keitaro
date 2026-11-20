@@ -27,6 +27,8 @@ class Campaign(Base):
     domain_id: Mapped[int | None]
     group_id: Mapped[int | None]
     traffic_source_id: Mapped[int | None]
+    state: Mapped[str | None] = mapped_column(String(16))
+    url: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     streams: Mapped[list["Stream"]] = relationship(
