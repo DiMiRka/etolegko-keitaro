@@ -1,0 +1,11 @@
+.env
+.venv/
+.idea/
+.claude/
+.git/
+recon/
+tests/
+**/__pycache__/
+*.pyc
+*.db
+TEST_TASK_ETOLEGKO_CONTEXT.md

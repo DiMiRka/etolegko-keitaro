@@ -7,7 +7,39 @@
 
 Стек: FastAPI, SQLAlchemy 2.0 (async), Alembic, httpx, pydantic-settings, Jinja2 + jQuery + Select2. Тесты на `unittest`.
 
-## Быстрый старт (SQLite)
+## Запуск в Docker
+
+Нужен Docker с Compose v2.
+
+```powershell
+copy .env.example .env            # Linux/macOS: cp .env.example .env
+```
+
+Впишите в `.env` значение `KEITARO_API_KEY` (в админке Keitaro: Профиль → API ключи), затем:
+
+```powershell
+docker compose up -d --build
+```
+
+Поднимутся PostgreSQL и приложение. При старте контейнер приложения сам применяет миграции (`alembic upgrade head`). Интерфейс откроется на http://localhost:8000, документация API на http://localhost:8000/docs. `DATABASE_URL` из `.env` внутри Docker не используется: приложение подключается к сервису `db`.
+
+Если порты 8000 или 5432 заняты, задайте другие:
+
+```powershell
+$env:APP_PORT=8080; $env:POSTGRES_PORT=5433; docker compose up -d --build
+```
+
+В Linux/macOS: `APP_PORT=8080 POSTGRES_PORT=5433 docker compose up -d --build`.
+
+Логи и остановка:
+
+```powershell
+docker compose logs -f app
+docker compose down            # данные базы остаются в volume pgdata
+docker compose down -v         # удалить и данные
+```
+
+## Быстрый старт без Docker (SQLite)
 
 Нужен Python 3.12+.
 
@@ -34,7 +66,9 @@ uvicorn app.main:app --reload
 
 Приложение откроется на http://localhost:8000, документация API на http://localhost:8000/docs.
 
-## PostgreSQL через Docker
+## Локальный запуск с PostgreSQL из Docker
+
+Можно поднять в Docker только базу, а приложение запускать локально:
 
 ```powershell
 docker compose up -d db
