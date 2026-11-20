@@ -7,6 +7,7 @@ from app.db import Base, make_engine, make_sessionmaker
 from app.errors import AppError
 from app.keitaro import KeitaroError
 from app.offers import OfferCatalog
+from app.references import References
 from tests.helpers import SETTINGS, ApiCase
 
 
@@ -16,6 +17,7 @@ class FakeKeitaro:
         self.streams: list[dict] = []
         self.deleted: list[int] = []
         self.offer_calls = 0
+        self.reference_calls = 0
         self.fail_stream_n = fail_stream_n
         self.fail_delete = fail_delete
 
@@ -26,6 +28,20 @@ class FakeKeitaro:
             {"id": 200, "name": "Miaflow", "state": "active"},
             {"id": 300, "name": "Old offer", "state": "archived"},
         ]
+
+    async def list_domains(self):
+        self.reference_calls += 1
+        return [
+            {"id": 1, "name": "kylovoa.com", "state": "active"},
+            {"id": 5, "name": "other.com", "state": "active"},
+            {"id": 6, "name": "old.com", "state": "deleted"},
+        ]
+
+    async def list_campaign_groups(self):
+        return [{"id": 2, "name": "FORTESTS"}, {"id": 7, "name": "alpha"}]
+
+    async def list_traffic_sources(self):
+        return [{"id": 3, "name": "FORTESTS", "state": "active"}]
 
     async def create_campaign(self, payload):
         campaign = {"id": 900 + len(self.campaigns), **payload}
@@ -184,6 +200,28 @@ class UpdateCampaignTest(DbCase):
         self.assertEqual(c.geo, "AU")
 
 
+class ReferencesTest(unittest.IsolatedAsyncioTestCase):
+    async def test_active_only_and_sorted_groups(self):
+        refs = await References(FakeKeitaro()).all()
+        self.assertEqual([d["id"] for d in refs["domains"]], [1, 5])
+        self.assertEqual([g["name"] for g in refs["groups"]], ["alpha", "FORTESTS"])
+        self.assertEqual(refs["traffic_sources"], [{"id": 3, "name": "FORTESTS"}])
+
+    async def test_check(self):
+        refs = References(FakeKeitaro())
+        await refs.check(5, 7, 3)
+        for ids in ((6, 2, 3), (1, 99, 3), (1, 2, 99)):
+            with self.assertRaises(AppError):
+                await refs.check(*ids)
+
+    async def test_cached(self):
+        kt = FakeKeitaro()
+        refs = References(kt)
+        await refs.all()
+        await refs.check(1, 2, 3)
+        self.assertEqual(kt.reference_calls, 1)
+
+
 class OfferCatalogTest(unittest.IsolatedAsyncioTestCase):
     async def test_search_by_name_and_id(self):
         catalog = OfferCatalog(FakeKeitaro())
@@ -223,6 +261,22 @@ class CampaignApiTest(ApiCase):
         self.assertEqual((updated["name"], updated["geo"]), ("test_mironov_c2", "RO"))
         self.ok("PATCH", f"/api/campaigns/{body['id']}", 400, json={"geo": "R1"})
         self.ok("PATCH", "/api/campaigns/999", 404, json={"geo": "RO"})
+
+    def test_references_endpoint(self):
+        refs = self.ok("GET", "/api/references")
+        self.assertEqual(refs["defaults"], {"domain_id": 1, "group_id": 2, "traffic_source_id": 3})
+        self.assertEqual([d["name"] for d in refs["domains"]], ["kylovoa.com", "other.com"])
+
+    def test_create_with_chosen_tracking(self):
+        body = {"name": "c3", "geo": "AU", "offer_id": 18813, "domain_id": 5, "group_id": 7}
+        created = self.ok("POST", "/api/campaigns", 201, json=body)
+        sent = self.kt.campaigns[created["keitaro_id"]]
+        self.assertEqual((sent["domain_id"], sent["group_id"], sent["traffic_source_id"]), (5, 7, 3))
+
+    def test_create_with_unknown_domain_fails_before_keitaro(self):
+        r = self.ok("POST", "/api/campaigns", 400, json={"name": "c4", "geo": "AU", "offer_id": 18813, "domain_id": 6})
+        self.assertIn("Домен 6", r["detail"])
+        self.assertEqual(self.kt.campaigns, {})
 
 
 if __name__ == "__main__":

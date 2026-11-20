@@ -1,27 +1,20 @@
-import asyncio
-import time
-
+from app.cache import CachedList
 from app.keitaro import KeitaroClient
 
 
 class OfferCatalog:
     def __init__(self, kt: KeitaroClient, ttl: float = 60.0):
         self._kt = kt
-        self._ttl = ttl
-        self._items: list[dict] = []
-        self._loaded_at: float | None = None
-        self._lock = asyncio.Lock()
+        self._cache = CachedList(self._load, ttl)
+
+    async def _load(self) -> list[dict]:
+        return [
+            {"id": o["id"], "name": o.get("name") or "", "state": o.get("state", "active")}
+            for o in await self._kt.list_offers()
+        ]
 
     async def all(self) -> list[dict]:
-        async with self._lock:
-            if self._loaded_at is None or time.monotonic() - self._loaded_at > self._ttl:
-                raw = await self._kt.list_offers()
-                self._items = [
-                    {"id": o["id"], "name": o.get("name") or "", "state": o.get("state", "active")}
-                    for o in raw
-                ]
-                self._loaded_at = time.monotonic()
-            return self._items
+        return await self._cache.get()
 
     async def search(self, q: str = "", limit: int = 20) -> list[dict]:
         q = q.strip().lower()

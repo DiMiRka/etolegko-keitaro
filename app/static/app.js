@@ -228,9 +228,25 @@ var CampaignList = (function () {
 })();
 
 var CampaignNew = (function () {
+  var REFS = [['domain_id', 'domains'], ['group_id', 'groups'], ['traffic_source_id', 'traffic_sources']];
+
+  function fillReferences($f, data) {
+    REFS.forEach(function (ref) {
+      var $sel = App.field($f, ref[0]).empty();
+      data[ref[1]].forEach(function (item) {
+        $('<option>').val(item.id).text(item.name + ' (#' + item.id + ')').appendTo($sel);
+      });
+      $sel.val(String(data.defaults[ref[0]]));
+      if ($sel.val() === null && data[ref[1]].length) $sel.val(String(data[ref[1]][0].id));
+      $sel.prop('disabled', false);
+      if (data[ref[1]].length > 8) $sel.select2({width: '100%'});
+    });
+  }
+
   function init() {
     var $f = $('#create-form');
     App.offerSelect(App.field($f, 'offer_id'), 'Поиск оффера по названию или ID');
+    App.api('GET', '/api/references').done(function (data) { fillReferences($f, data); });
     $f.on('submit', function (e) {
       e.preventDefault();
       var body = {
@@ -238,6 +254,10 @@ var CampaignNew = (function () {
         geo: App.field($f, 'geo').val(),
         offer_id: Number(App.field($f, 'offer_id').val())
       };
+      REFS.forEach(function (ref) {
+        var v = Number(App.field($f, ref[0]).val());
+        if (v) body[ref[0]] = v;
+      });
       if (!body.offer_id) { App.toast('Выберите оффер', true); return; }
       App.busy($f.find('button[type=submit]'), App.api('POST', '/api/campaigns', body)).done(function (c) {
         window.location = '/campaigns/' + c.id;

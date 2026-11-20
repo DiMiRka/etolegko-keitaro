@@ -5,7 +5,8 @@ from sqlalchemy import select
 
 from app import campaigns, stats
 from app import streams as svc
-from app.deps import CatalogDep, KeitaroDep, SessionDep, SettingsDep
+from app.campaigns import Tracking
+from app.deps import CatalogDep, KeitaroDep, ReferencesDep, SessionDep, SettingsDep
 from app.errors import AppError
 from app.models import Campaign
 from app.schemas import (
@@ -34,12 +35,37 @@ async def list_campaigns(session: SessionDep):
     return [CampaignShort(id=c.id, keitaro_id=c.keitaro_id, name=c.name, geo=c.geo) for c in rows]
 
 
+@router.get("/references")
+async def get_references(references: ReferencesDep, settings: SettingsDep):
+    defaults = Tracking.defaults(settings)
+    return {
+        **await references.all(),
+        "defaults": {
+            "domain_id": defaults.domain_id,
+            "group_id": defaults.group_id,
+            "traffic_source_id": defaults.traffic_source_id,
+        },
+    }
+
+
 @router.post("/campaigns", response_model=CampaignOut, status_code=201)
 async def create_campaign(
-    body: CampaignCreate, session: SessionDep, kt: KeitaroDep, catalog: CatalogDep, settings: SettingsDep
+    body: CampaignCreate,
+    session: SessionDep,
+    kt: KeitaroDep,
+    catalog: CatalogDep,
+    references: ReferencesDep,
+    settings: SettingsDep,
 ):
+    defaults = Tracking.defaults(settings)
+    tracking = Tracking(
+        body.domain_id or defaults.domain_id,
+        body.group_id or defaults.group_id,
+        body.traffic_source_id or defaults.traffic_source_id,
+    )
+    await references.check(tracking.domain_id, tracking.group_id, tracking.traffic_source_id)
     campaign = await campaigns.create_campaign(
-        session, kt, catalog, settings, body.name, body.geo, body.offer_id
+        session, kt, catalog, settings, body.name, body.geo, body.offer_id, tracking
     )
     return CampaignOut.of(campaign)
 

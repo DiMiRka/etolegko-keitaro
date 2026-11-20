@@ -1,5 +1,6 @@
 import re
 import secrets
+from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,7 +33,18 @@ def make_alias(name: str) -> str:
     return f"{slug}-{secrets.token_hex(3)}"
 
 
-def campaign_payload(name: str, alias: str, settings: Settings) -> dict:
+@dataclass(frozen=True)
+class Tracking:
+    domain_id: int
+    group_id: int
+    traffic_source_id: int
+
+    @classmethod
+    def defaults(cls, settings: Settings) -> "Tracking":
+        return cls(settings.keitaro_domain_id, settings.keitaro_group_id, settings.keitaro_traffic_source_id)
+
+
+def campaign_payload(name: str, alias: str, tracking: Tracking) -> dict:
     return {
         "name": name,
         "alias": alias,
@@ -42,9 +54,9 @@ def campaign_payload(name: str, alias: str, settings: Settings) -> dict:
         "cost_value": 0,
         "cost_currency": "USD",
         "cost_auto": True,
-        "domain_id": settings.keitaro_domain_id,
-        "group_id": settings.keitaro_group_id,
-        "traffic_source_id": settings.keitaro_traffic_source_id,
+        "domain_id": tracking.domain_id,
+        "group_id": tracking.group_id,
+        "traffic_source_id": tracking.traffic_source_id,
     }
 
 
@@ -85,13 +97,15 @@ async def create_campaign(
     name: str,
     geo: str,
     offer_id: int,
+    tracking: Tracking | None = None,
 ) -> Campaign:
     name = full_name(name, settings.campaign_prefix)
     geo = normalize_geo(geo)
     if await catalog.get(offer_id) is None:
         raise AppError(f"Оффер {offer_id} не найден в Keitaro")
+    tracking = tracking or Tracking.defaults(settings)
 
-    created = await kt.create_campaign(campaign_payload(name, make_alias(name), settings))
+    created = await kt.create_campaign(campaign_payload(name, make_alias(name), tracking))
     campaign_id = created["id"]
     try:
         await kt.create_stream(geo_stream_payload(campaign_id, geo, settings.geo_redirect_url))

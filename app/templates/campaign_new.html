@@ -19,6 +19,19 @@
     <label>Оффер
       <select name="offer_id" class="offer-select" required></select>
     </label>
+    <fieldset class="fieldset">
+      <legend>Трекинг</legend>
+      <label>Домен
+        <select name="domain_id" class="ref-select" disabled><option>Загрузка…</option></select>
+      </label>
+      <label>Группа
+        <select name="group_id" class="ref-select" disabled><option>Загрузка…</option></select>
+      </label>
+      <label>Источник
+        <select name="traffic_source_id" class="ref-select" disabled><option>Загрузка…</option></select>
+      </label>
+      <span class="hint">Списки берутся из Keitaro. Ротация потоков «по позиции», модель затрат CPC, стоимость 0 USD из параметра cost</span>
+    </fieldset>
     <div class="form-actions">
       <button type="submit" class="btn primary">Создать</button>
       <a href="/campaigns" class="btn">Отмена</a>

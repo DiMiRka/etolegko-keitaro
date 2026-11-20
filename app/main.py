@@ -13,6 +13,7 @@ from app.deps import SessionDep
 from app.errors import AppError, NotFound
 from app.keitaro import KeitaroClient, KeitaroError
 from app.offers import OfferCatalog
+from app.references import References
 from app.web import router as web_router
 
 
@@ -28,6 +29,7 @@ async def lifespan(app: FastAPI):
         timeout=settings.keitaro_timeout,
     )
     app.state.catalog = OfferCatalog(app.state.keitaro)
+    app.state.references = References(app.state.keitaro)
     yield
     await app.state.keitaro.aclose()
     await engine.dispose()

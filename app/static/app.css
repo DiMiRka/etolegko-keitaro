@@ -127,6 +127,9 @@ input.geo { text-transform: uppercase; max-width: 160px; }
 .btn.loading { cursor: progress; }
 .form .btn { align-self: flex-start; }
 
+.fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px 12px; margin: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.fieldset legend { padding: 0 4px; font-weight: 600; font-size: 13px; }
+.form select { width: 100%; }
 .form-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .form-actions .btn { align-self: auto; }
 .card.narrow { max-width: 560px; }

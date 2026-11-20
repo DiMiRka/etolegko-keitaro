@@ -7,6 +7,9 @@ class CampaignCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     geo: str = Field(min_length=2, max_length=2)
     offer_id: int
+    domain_id: int | None = None
+    group_id: int | None = None
+    traffic_source_id: int | None = None
 
 
 class CampaignUpdate(BaseModel):

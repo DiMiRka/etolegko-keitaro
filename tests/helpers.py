@@ -5,9 +5,10 @@ from sqlalchemy.pool import StaticPool
 
 from app.config import Settings
 from app.db import Base, make_engine, make_sessionmaker
-from app.deps import get_catalog, get_keitaro, get_session, settings_dep
+from app.deps import get_catalog, get_keitaro, get_references, get_session, settings_dep
 from app.main import app
 from app.offers import OfferCatalog
+from app.references import References
 
 SETTINGS = Settings(
     _env_file=None, keitaro_api_key="x", campaign_prefix="test_mironov_",
@@ -23,6 +24,7 @@ class ApiCase(unittest.TestCase):
         self.kt = self.make_keitaro()
         self.engine = None
         catalog = OfferCatalog(self.kt)
+        references = References(self.kt)
 
         async def session_override():
             if self.engine is None:
@@ -36,6 +38,7 @@ class ApiCase(unittest.TestCase):
             get_session: session_override,
             get_keitaro: lambda: self.kt,
             get_catalog: lambda: catalog,
+            get_references: lambda: references,
             settings_dep: lambda: SETTINGS,
         }
         self.addCleanup(lambda: setattr(app, "dependency_overrides", {}))
