@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     keitaro_api_key: str = ""
     keitaro_user_agent: str = "etolegko-keitaro-wrapper/0.1"
     keitaro_timeout: float = 20.0
+    keitaro_timezone: str = "Europe/Moscow"
 
     database_url: str = "sqlite+aiosqlite:///./app.db"
 

@@ -96,6 +96,9 @@ class KeitaroClient:
     async def update_stream(self, stream_id: int, payload: dict) -> dict:
         return await self._request("PUT", f"/streams/{stream_id}", json=payload)
 
+    async def build_report(self, payload: dict) -> dict:
+        return await self._request("POST", "/report/build", json=payload)
+
     async def list_offers(self) -> list[dict]:
         return await self._request("GET", "/offers")
 

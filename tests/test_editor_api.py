@@ -101,6 +101,23 @@ class EditorApiTest(ApiCase):
         r = self.ok("POST", f"/api/campaigns/{self.campaign_id}/fetch", 400)
         self.assertIn("больше нет в Keitaro", r["detail"])
 
+    def test_stats(self):
+        from app.stats import day_range
+
+        today = day_range(1, "Europe/Moscow")[0]
+
+        async def build_report(body):
+            self.assertEqual(body["filters"][0]["expression"], CAMPAIGN_KT_ID)
+            self.assertEqual(body["range"]["to"], today)
+            return {"rows": [{"stream_id": OFFER_STREAM_ID, "offer_id": 2, "day": today, "clicks": 7}]}
+
+        self.kt.build_report = build_report
+        data = self.ok("GET", f"/api/campaigns/{self.campaign_id}/stats")
+        self.assertEqual(len(data["days"]), 7)
+        self.assertEqual(data["total"]["today"], 7)
+        self.assertEqual(data["streams"][str(OFFER_STREAM_ID)]["offers"]["2"]["by_day"][-1], 7)
+        self.ok("GET", f"/api/campaigns/{self.campaign_id}/stats", 422, params={"days": 0})
+
     def test_import_unknown_campaign(self):
         self.ok("POST", "/api/campaigns/import", 404, json={"keitaro_id": 1})
 

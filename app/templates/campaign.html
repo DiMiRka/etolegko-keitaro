@@ -16,7 +16,7 @@
   <form id="main-form" class="form grid-form">
     <label>Название
       <input name="name" required value="{{ campaign.name }}" autocomplete="off">
-      <span class="hint">Префикс {{ prefix }} добавится, если его нет</span>
+      <span class="hint">Префикс {{ prefix }} добавится, если его нет (для тестового сервиса)</span>
     </label>
     <label>Гео
       <input name="geo" maxlength="2" value="{{ campaign.geo or '' }}" placeholder="—" autocomplete="off" class="geo">
@@ -31,6 +31,14 @@
       <span class="hint">Изменения сразу сохраняются в Keitaro</span>
     </div>
   </form>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2 id="stats-title">Статистика</h2>
+    <button class="btn small" id="stats-refresh">Обновить</button>
+  </div>
+  <div id="stats"><p class="muted">Загрузка…</p></div>
 </section>
 
 <div class="section-head">

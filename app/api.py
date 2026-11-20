@@ -1,7 +1,9 @@
-from fastapi import APIRouter
+from typing import Annotated
+
+from fastapi import APIRouter, Query
 from sqlalchemy import select
 
-from app import campaigns
+from app import campaigns, stats
 from app import streams as svc
 from app.deps import CatalogDep, KeitaroDep, SessionDep, SettingsDep
 from app.errors import AppError
@@ -65,6 +67,15 @@ async def update_campaign(
 @router.delete("/campaigns/{campaign_id}", status_code=204)
 async def forget_campaign(campaign_id: int, session: SessionDep):
     await svc.forget_campaign(session, await svc.load_campaign(session, campaign_id))
+
+
+@router.get("/campaigns/{campaign_id}/stats")
+async def campaign_stats(
+    campaign_id: int, session: SessionDep, kt: KeitaroDep, settings: SettingsDep,
+    days: Annotated[int, Query(ge=1, le=90)] = 7,
+):
+    campaign = await svc.load_campaign(session, campaign_id)
+    return await stats.campaign_stats(kt, campaign.keitaro_id, days, settings.keitaro_timezone)
 
 
 @router.post("/campaigns/{campaign_id}/fetch", response_model=CampaignOut)

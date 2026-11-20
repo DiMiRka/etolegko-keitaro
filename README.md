@@ -109,6 +109,7 @@ python -m unittest discover -s tests
 | `KEITARO_URL` | `https://tlgk.host` | адрес трекера, путь `/admin_api/v1` клиент добавляет сам |
 | `KEITARO_API_KEY` | — | ключ Admin API |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./app.db` | база приложения |
+| `KEITARO_TIMEZONE` | `Europe/Moscow` | часовой пояс отчётов: границы дней и «сегодня» |
 | `CAMPAIGN_PREFIX` | `test_mironov_` | префикс имени новой кампании |
 | `KEITARO_DOMAIN_ID` | `1813` | домен новой кампании |
 | `KEITARO_GROUP_ID` | `10332` | группа (FORTESTS) |
@@ -139,6 +140,10 @@ python -m unittest discover -s tests
 
 Keitaro сам сумму долей не проверяет (принимает и 99), поэтому проверка выполняется на нашей стороне перед Push.
 
+### Статистика
+
+В карточке кампании показана статистика за последние 7 дней, включая сегодня, в часовом поясе `KEITARO_TIMEZONE`: клики, уникальные клики, конверсии, CR, доход и график кликов по дням. У каждого потока указаны клики за сегодня и за период, у каждого оффера клики и тренд по дням. Всё это собирается одним запросом `POST /report/build` с разбивкой по `stream_id`, `offer_id` и `day` и фильтром по кампании. Дни без кликов показываются нулями.
+
 ## API
 
 | Метод | Путь | Описание |
@@ -150,6 +155,7 @@ Keitaro сам сумму долей не проверяет (принимает
 | GET | `/api/campaigns/{id}` | кампания с потоками и офферами |
 | PATCH | `/api/campaigns/{id}` | изменить `{name?, geo?}`: имя кампании и страну в фильтре гео-потока, сразу в Keitaro |
 | DELETE | `/api/campaigns/{id}` | убрать кампанию из нашей базы (в Keitaro не меняется) |
+| GET | `/api/campaigns/{id}/stats?days=7` | статистика из `POST /report/build`: итоги, клики по дням, по потокам и офферам |
 | POST | `/api/campaigns/{id}/fetch` | Fetch streams from KT |
 | POST | `/api/streams/{id}/offers` | добавить оффер `{offer_id}` |
 | POST | `/api/streams/{id}/offers/{offer_id}/remove` | Remove |
