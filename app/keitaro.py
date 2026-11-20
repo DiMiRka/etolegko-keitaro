@@ -78,6 +78,9 @@ class KeitaroClient:
     async def create_campaign(self, payload: dict) -> dict:
         return await self._request("POST", "/campaigns", json=payload)
 
+    async def update_campaign(self, campaign_id: int, payload: dict) -> dict:
+        return await self._request("PUT", f"/campaigns/{campaign_id}", json=payload)
+
     async def delete_campaign(self, campaign_id: int) -> None:
         await self._request("DELETE", f"/campaigns/{campaign_id}")
 

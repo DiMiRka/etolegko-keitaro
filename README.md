@@ -148,6 +148,8 @@ Keitaro сам сумму долей не проверяет (принимает
 | POST | `/api/campaigns` | создать кампанию `{name, geo, offer_id}` |
 | POST | `/api/campaigns/import` | подключить существующую кампанию `{keitaro_id}` |
 | GET | `/api/campaigns/{id}` | кампания с потоками и офферами |
+| PATCH | `/api/campaigns/{id}` | изменить `{name?, geo?}`: имя кампании и страну в фильтре гео-потока, сразу в Keitaro |
+| DELETE | `/api/campaigns/{id}` | убрать кампанию из нашей базы (в Keitaro не меняется) |
 | POST | `/api/campaigns/{id}/fetch` | Fetch streams from KT |
 | POST | `/api/streams/{id}/offers` | добавить оффер `{offer_id}` |
 | POST | `/api/streams/{id}/offers/{offer_id}/remove` | Remove |

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Новая кампания · Keitaro wrapper{% endblock %}
+{% block content %}
+<nav class="crumbs"><a href="/campaigns">Кампании</a> / <span>Новая кампания</span></nav>
+
+<div class="page-head">
+  <h1>Новая кампания</h1>
+</div>
+
+<section class="card narrow">
+  <form id="create-form" class="form">
+    <label>Название
+      <div class="prefixed"><span>{{ prefix }}</span><input name="name" required placeholder="campaign1" autocomplete="off"></div>
+    </label>
+    <label>Гео
+      <input name="geo" required maxlength="2" placeholder="MX, AU, RO, ..." autocomplete="off" class="geo">
+      <span class="hint">Трафик из этой страны уйдёт на google.com, остальной на оффер</span>
+    </label>
+    <label>Оффер
+      <select name="offer_id" class="offer-select" required></select>
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="btn primary">Создать</button>
+      <a href="/campaigns" class="btn">Отмена</a>
+    </div>
+  </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>$(function () { CampaignNew.init(); });</script>
+{% endblock %}

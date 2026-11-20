@@ -96,6 +96,14 @@ def _sync_offers(stream: Stream, kt_offers: list[dict], names: dict[int, str]) -
         ))
 
 
+def _geo_of(kt_streams: list[dict]) -> str | None:
+    for s in sorted(kt_streams, key=lambda s: s.get("position") or 0):
+        for f in s.get("filters") or []:
+            if f.get("name") == "country" and f.get("mode") == "accept" and len(f.get("payload") or []) == 1:
+                return f["payload"][0]
+    return None
+
+
 async def fetch_streams(session: AsyncSession, kt: KeitaroClient, campaign: Campaign) -> Campaign:
     try:
         info = await kt.get_campaign(campaign.keitaro_id)
@@ -108,6 +116,7 @@ async def fetch_streams(session: AsyncSession, kt: KeitaroClient, campaign: Camp
             ) from e
         raise
     campaign.name, campaign.alias = info["name"], info["alias"]
+    campaign.geo = _geo_of(kt_streams) or campaign.geo
     names = await _offer_names(kt)
     now = datetime.now(UTC).replace(tzinfo=None)
     local = {s.keitaro_id: s for s in campaign.streams}

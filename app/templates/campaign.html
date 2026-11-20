@@ -1,27 +1,45 @@
 {% extends "base.html" %}
-{% block title %}{{ campaign.name }} · Keitaro Streams{% endblock %}
+{% block title %}{{ campaign.name }} · Keitaro wrapper{% endblock %}
 {% block content %}
-<nav class="crumbs">
-  <a href="/">Campaigns</a> / <span>{{ campaign.name }}</span> / <span>Keitaro Streams</span>
-</nav>
+<nav class="crumbs"><a href="/campaigns">Кампании</a> / <span id="crumb-name">{{ campaign.name }}</span></nav>
 
 <div class="page-head">
-  <div>
-    <h1>{{ campaign.name }}</h1>
-    <div class="muted">Keitaro ID {{ campaign.keitaro_id }}{% if campaign.geo %} · Geo {{ campaign.geo }}{% endif %}</div>
-  </div>
+  <h1 id="title">{{ campaign.name }}</h1>
   <div class="actions">
-    <button class="btn primary" id="fetch">Fetch streams from KT</button>
-    <a class="btn" href="{{ kt_url }}" target="_blank" rel="noopener">View in KT</a>
-    <button class="btn danger" id="forget" title="Убрать кампанию из нашей базы, в Keitaro ничего не меняется">Remove from list</button>
+    <a class="btn" href="{{ kt_url }}" target="_blank" rel="noopener">Открыть в Keitaro</a>
+    <button class="btn danger" id="forget" title="Убрать кампанию из нашей базы, в Keitaro ничего не меняется">Убрать из списка</button>
   </div>
 </div>
 
+<section class="card">
+  <h2>Основное</h2>
+  <form id="main-form" class="form grid-form">
+    <label>Название
+      <input name="name" required value="{{ campaign.name }}" autocomplete="off">
+      <span class="hint">Префикс {{ prefix }} добавится, если его нет</span>
+    </label>
+    <label>Гео
+      <input name="geo" maxlength="2" value="{{ campaign.geo or '' }}" placeholder="—" autocomplete="off" class="geo">
+      <span class="hint">Страна в фильтре потока, который ведёт на google.com</span>
+    </label>
+    <div class="meta">
+      <div><span class="muted">ID в Keitaro</span> {{ campaign.keitaro_id }}</div>
+      <div><span class="muted">Alias</span> <span id="alias">{{ campaign.alias }}</span></div>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn primary" disabled>Сохранить</button>
+      <span class="hint">Изменения сразу сохраняются в Keitaro</span>
+    </div>
+  </form>
+</section>
+
+<div class="section-head">
+  <h2>Потоки</h2>
+  <button class="btn" id="fetch">Загрузить потоки из Keitaro</button>
+</div>
 <div id="streams"><p class="muted">Загрузка…</p></div>
 {% endblock %}
 
 {% block scripts %}
-<script>
-$(function () { Editor.init({{ campaign.id }}); });
-</script>
+<script>$(function () { CampaignCard.init({{ campaign.id }}); });</script>
 {% endblock %}

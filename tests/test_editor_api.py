@@ -76,12 +76,18 @@ class EditorApiTest(ApiCase):
         self.assertIn("boom", stream["last_error"])
 
     def test_pages_render(self):
-        r = self.client.get("/")
+        r = self.client.get("/", follow_redirects=False)
+        self.assertEqual((r.status_code, r.headers["location"]), (302, "/campaigns"))
+        r = self.client.get("/campaigns")
         self.assertEqual(r.status_code, 200)
-        self.assertIn("New campaign", r.text)
+        self.assertIn('href="/campaigns/new"', r.text)
+        r = self.client.get("/campaigns/new")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("create-form", r.text)
         r = self.client.get(f"/campaigns/{self.campaign_id}")
         self.assertEqual(r.status_code, 200)
         self.assertIn(f"/admin/#!/campaign/{CAMPAIGN_KT_ID}", r.text)
+        self.assertIn('value="test_mironov_editor"', r.text)
         self.assertEqual(self.client.get("/campaigns/999").status_code, 404)
 
     def test_forget_campaign(self):

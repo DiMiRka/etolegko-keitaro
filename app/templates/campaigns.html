@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Кампании · Keitaro wrapper{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Кампании</h1>
+  <a class="btn primary" href="/campaigns/new">+ Новая кампания</a>
+</div>
+
+<section class="card flush">
+  <table class="table clickable" id="campaigns">
+    <thead><tr><th>Название</th><th>Гео</th><th>ID в Keitaro</th></tr></thead>
+    <tbody><tr><td colspan="3" class="muted">Загрузка…</td></tr></tbody>
+  </table>
+</section>
+
+<section class="card">
+  <h2>Подключить кампанию из Keitaro</h2>
+  <p class="muted small">Если кампания уже есть в Keitaro, её можно добавить в список по ID и редактировать её потоки.</p>
+  <form id="import-form" class="inline-form">
+    <input name="keitaro_id" type="number" min="1" required placeholder="ID кампании, например 215444">
+    <button type="submit" class="btn">Подключить</button>
+  </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>$(function () { CampaignList.init(); });</script>
+{% endblock %}

@@ -11,6 +11,7 @@ from app.schemas import (
     CampaignImport,
     CampaignOut,
     CampaignShort,
+    CampaignUpdate,
     OfferAdd,
     OfferOut,
     PinIn,
@@ -50,6 +51,15 @@ async def import_campaign(body: CampaignImport, session: SessionDep, kt: Keitaro
 @router.get("/campaigns/{campaign_id}", response_model=CampaignOut)
 async def get_campaign(campaign_id: int, session: SessionDep):
     return CampaignOut.of(await svc.load_campaign(session, campaign_id))
+
+
+@router.patch("/campaigns/{campaign_id}", response_model=CampaignOut)
+async def update_campaign(
+    campaign_id: int, body: CampaignUpdate, session: SessionDep, kt: KeitaroDep, settings: SettingsDep
+):
+    campaign = await svc.load_campaign(session, campaign_id)
+    updated = await campaigns.update_campaign(session, kt, settings, campaign, body.name, body.geo)
+    return CampaignOut.of(updated)
 
 
 @router.delete("/campaigns/{campaign_id}", status_code=204)

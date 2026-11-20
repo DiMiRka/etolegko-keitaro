@@ -20,6 +20,13 @@ def full_name(name: str, prefix: str) -> str:
     return name if name.startswith(prefix) else prefix + name
 
 
+def normalize_geo(geo: str) -> str:
+    geo = geo.strip().upper()
+    if not GEO_RE.match(geo):
+        raise AppError("Гео: двухбуквенный код страны, например AU")
+    return geo
+
+
 def make_alias(name: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40]
     return f"{slug}-{secrets.token_hex(3)}"
@@ -45,7 +52,7 @@ def geo_stream_payload(campaign_id: int, geo: str, redirect_url: str) -> dict:
     return {
         "campaign_id": campaign_id,
         "type": "regular",
-        "name": f"{geo} -> Google",
+        "name": geo_stream_name(geo),
         "position": 1,
         "state": "active",
         "schema": "redirect",
@@ -80,9 +87,7 @@ async def create_campaign(
     offer_id: int,
 ) -> Campaign:
     name = full_name(name, settings.campaign_prefix)
-    geo = geo.strip().upper()
-    if not GEO_RE.match(geo):
-        raise AppError("Гео: двухбуквенный код страны, например AU")
+    geo = normalize_geo(geo)
     if await catalog.get(offer_id) is None:
         raise AppError(f"Оффер {offer_id} не найден в Keitaro")
 
@@ -102,4 +107,49 @@ async def create_campaign(
     session.add(campaign)
     await session.commit()
     campaign = await load_campaign(session, campaign.id)
+    return await fetch_streams(session, kt, campaign)
+
+
+def country_filter(stream: dict) -> dict | None:
+    return next((f for f in stream.get("filters") or [] if f.get("name") == "country"), None)
+
+
+def geo_stream_name(geo: str) -> str:
+    return f"{geo} -> Google"
+
+
+async def update_campaign(
+    session: AsyncSession,
+    kt: KeitaroClient,
+    settings: Settings,
+    campaign: Campaign,
+    name: str | None = None,
+    geo: str | None = None,
+) -> Campaign:
+    new_name = full_name(name, settings.campaign_prefix) if name is not None else None
+    new_geo = normalize_geo(geo) if geo is not None else None
+
+    geo_stream = None
+    if new_geo is not None and new_geo != campaign.geo:
+        kt_streams = sorted(await kt.list_streams(campaign.keitaro_id), key=lambda s: s.get("position") or 0)
+        geo_stream = next((s for s in kt_streams if country_filter(s)), None)
+        if geo_stream is None:
+            raise AppError("В кампании нет потока с фильтром по стране, гео поменять нельзя")
+
+    if new_name is not None and new_name != campaign.name:
+        await kt.update_campaign(campaign.keitaro_id, {"name": new_name})
+
+    if geo_stream is not None:
+        filters = []
+        for f in geo_stream["filters"]:
+            item = {"id": f["id"], "name": f["name"], "mode": f["mode"], "payload": f["payload"]}
+            if f is country_filter(geo_stream):
+                item["payload"] = [new_geo]
+            filters.append(item)
+        payload: dict = {"filters": filters}
+        old = (country_filter(geo_stream)["payload"] or [""])[0]
+        if geo_stream["name"] == geo_stream_name(old):
+            payload["name"] = geo_stream_name(new_geo)
+        await kt.update_stream(geo_stream["id"], payload)
+
     return await fetch_streams(session, kt, campaign)

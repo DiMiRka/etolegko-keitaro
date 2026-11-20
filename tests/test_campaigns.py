@@ -44,11 +44,21 @@ class FakeKeitaro:
         if self.fail_stream_n is not None and len(self.streams) + 1 == self.fail_stream_n:
             raise KeitaroError("Keitaro HTTP 422: bad stream", 422)
         stream = {"id": 5000 + len(self.streams), "offers": [], **payload}
+        stream["filters"] = [{"id": 70 + i, **f} for i, f in enumerate(payload.get("filters", []))]
         self.streams.append(stream)
         return stream
 
     async def list_streams(self, campaign_id):
         return [s for s in self.streams if s["campaign_id"] == campaign_id]
+
+    async def update_campaign(self, campaign_id, payload):
+        self.campaigns[campaign_id].update(payload)
+        return self.campaigns[campaign_id]
+
+    async def update_stream(self, stream_id, payload):
+        stream = next(s for s in self.streams if s["id"] == stream_id)
+        stream.update(payload)
+        return stream
 
 
 class DbCase(unittest.IsolatedAsyncioTestCase):
@@ -84,7 +94,7 @@ class CreateCampaignTest(DbCase):
 
         geo, offers = kt.streams
         self.assertEqual((geo["position"], geo["schema"], geo["action_payload"]), (1, "redirect", "https://google.com"))
-        self.assertEqual(geo["filters"], [{"name": "country", "mode": "accept", "payload": ["AU"]}])
+        self.assertEqual(geo["filters"], [{"id": 70, "name": "country", "mode": "accept", "payload": ["AU"]}])
         self.assertEqual((offers["position"], offers["schema"]), (2, "landings"))
         self.assertEqual(offers["offers"], [{"offer_id": 18813, "share": 100, "state": "active"}])
 
@@ -124,6 +134,56 @@ class CreateCampaignTest(DbCase):
         self.assertIn("осталась в Keitaro", str(ctx.exception))
 
 
+class UpdateCampaignTest(DbCase):
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.kt = FakeKeitaro()
+        self.campaign = await campaigns.create_campaign(
+            self.session, self.kt, OfferCatalog(self.kt), SETTINGS, "c1", "AU", 18813
+        )
+
+    async def update(self, **kwargs):
+        return await campaigns.update_campaign(self.session, self.kt, SETTINGS, self.campaign, **kwargs)
+
+    async def test_rename_adds_prefix(self):
+        c = await self.update(name="renamed")
+        self.assertEqual(c.name, "test_mironov_renamed")
+        self.assertEqual(self.kt.campaigns[c.keitaro_id]["name"], "test_mironov_renamed")
+
+    async def test_change_geo_updates_filter_in_place(self):
+        c = await self.update(geo="mx")
+        geo_stream = self.kt.streams[0]
+        self.assertEqual(geo_stream["filters"], [{"id": 70, "name": "country", "mode": "accept", "payload": ["MX"]}])
+        self.assertEqual(geo_stream["name"], "MX -> Google")
+        self.assertEqual(c.geo, "MX")
+        self.assertEqual(c.streams[0].name, "MX -> Google")
+
+    async def test_custom_stream_name_is_kept(self):
+        self.kt.streams[0]["name"] = "Australia"
+        await self.update(geo="RO")
+        self.assertEqual(self.kt.streams[0]["name"], "Australia")
+
+    async def test_same_values_do_nothing(self):
+        self.kt.update_campaign = self.kt.update_stream = None
+        c = await self.update(name="test_mironov_c1", geo="au")
+        self.assertEqual((c.name, c.geo), ("test_mironov_c1", "AU"))
+
+    async def test_geo_without_country_stream_fails(self):
+        self.kt.streams[0]["filters"] = []
+        with self.assertRaises(AppError):
+            await self.update(geo="MX")
+
+    async def test_invalid_geo(self):
+        with self.assertRaises(AppError):
+            await self.update(geo="M1")
+
+    async def test_fetch_derives_geo(self):
+        self.campaign.geo = None
+        await self.session.commit()
+        c = await campaigns.fetch_streams(self.session, self.kt, self.campaign)
+        self.assertEqual(c.geo, "AU")
+
+
 class OfferCatalogTest(unittest.IsolatedAsyncioTestCase):
     async def test_search_by_name_and_id(self):
         catalog = OfferCatalog(FakeKeitaro())
@@ -158,6 +218,11 @@ class CampaignApiTest(ApiCase):
         offers = self.ok("GET", "/api/offers", params={"q": "flex"})
         self.assertEqual(offers, [{"id": 18813, "name": "18813 Flexacil PE"}])
         self.assertEqual(len(self.ok("GET", "/api/campaigns")), 1)
+
+        updated = self.ok("PATCH", f"/api/campaigns/{body['id']}", json={"name": "c2", "geo": "ro"})
+        self.assertEqual((updated["name"], updated["geo"]), ("test_mironov_c2", "RO"))
+        self.ok("PATCH", f"/api/campaigns/{body['id']}", 400, json={"geo": "R1"})
+        self.ok("PATCH", "/api/campaigns/999", 404, json={"geo": "RO"})
 
 
 if __name__ == "__main__":

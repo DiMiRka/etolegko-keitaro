@@ -9,6 +9,11 @@ class CampaignCreate(BaseModel):
     offer_id: int
 
 
+class CampaignUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    geo: str | None = Field(default=None, min_length=2, max_length=2)
+
+
 class CampaignImport(BaseModel):
     keitaro_id: int
 
