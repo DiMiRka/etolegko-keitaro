@@ -24,6 +24,9 @@ class Campaign(Base):
     name: Mapped[str] = mapped_column(String(255))
     alias: Mapped[str] = mapped_column(String(255))
     geo: Mapped[str | None] = mapped_column(String(8))
+    domain_id: Mapped[int | None]
+    group_id: Mapped[int | None]
+    traffic_source_id: Mapped[int | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     streams: Mapped[list["Stream"]] = relationship(

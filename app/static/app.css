@@ -137,7 +137,10 @@ input.geo { text-transform: uppercase; max-width: 160px; }
 .card.flush .table th, .card.flush .table td { padding: 10px 16px; }
 
 .grid-form { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px 16px; }
-.grid-form .meta, .grid-form .form-actions { grid-column: 1 / -1; }
+.grid-form .meta, .grid-form .form-actions, .grid-form .tracking-row { grid-column: 1 / -1; }
+.tracking-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 16px; }
+.tracking-row label { display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
+@media (max-width: 760px) { .tracking-row { grid-template-columns: minmax(0, 1fr); } }
 .grid-form input.geo { max-width: none; }
 .meta { display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px; }
 .meta .muted { margin-right: 4px; }

@@ -193,6 +193,28 @@ class UpdateCampaignTest(DbCase):
         with self.assertRaises(AppError):
             await self.update(geo="M1")
 
+    async def test_create_stores_tracking(self):
+        c = self.campaign
+        self.assertEqual((c.domain_id, c.group_id, c.traffic_source_id), (1, 2, 3))
+
+    async def test_change_tracking_in_one_request(self):
+        calls = []
+        original = self.kt.update_campaign
+
+        async def spy(campaign_id, payload):
+            calls.append(payload)
+            return await original(campaign_id, payload)
+
+        self.kt.update_campaign = spy
+        c = await self.update(name="renamed", domain_id=5, group_id=7, traffic_source_id=3)
+        self.assertEqual(calls, [{"name": "test_mironov_renamed", "domain_id": 5, "group_id": 7}])
+        self.assertEqual((c.domain_id, c.group_id, c.traffic_source_id), (5, 7, 3))
+
+    async def test_fetch_reads_tracking(self):
+        self.kt.campaigns[self.campaign.keitaro_id].update(domain_id=5, group_id=7)
+        c = await campaigns.fetch_streams(self.session, self.kt, self.campaign)
+        self.assertEqual((c.domain_id, c.group_id), (5, 7))
+
     async def test_fetch_derives_geo(self):
         self.campaign.geo = None
         await self.session.commit()
@@ -261,6 +283,12 @@ class CampaignApiTest(ApiCase):
         self.assertEqual((updated["name"], updated["geo"]), ("test_mironov_c2", "RO"))
         self.ok("PATCH", f"/api/campaigns/{body['id']}", 400, json={"geo": "R1"})
         self.ok("PATCH", "/api/campaigns/999", 404, json={"geo": "RO"})
+
+        moved = self.ok("PATCH", f"/api/campaigns/{body['id']}", json={"group_id": 7, "domain_id": 5})
+        self.assertEqual((moved["group_id"], moved["domain_id"], moved["traffic_source_id"]), (7, 5, 3))
+        r = self.ok("PATCH", f"/api/campaigns/{body['id']}", 400, json={"group_id": 99})
+        self.assertIn("Группа 99", r["detail"])
+        self.assertEqual(self.kt.campaigns[body["keitaro_id"]]["group_id"], 7)
 
     def test_references_endpoint(self):
         refs = self.ok("GET", "/api/references")

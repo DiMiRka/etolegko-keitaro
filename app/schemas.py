@@ -15,6 +15,9 @@ class CampaignCreate(BaseModel):
 class CampaignUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     geo: str | None = Field(default=None, min_length=2, max_length=2)
+    domain_id: int | None = None
+    group_id: int | None = None
+    traffic_source_id: int | None = None
 
 
 class CampaignImport(BaseModel):
@@ -84,11 +87,15 @@ class CampaignOut(BaseModel):
     name: str
     alias: str
     geo: str | None
+    domain_id: int | None
+    group_id: int | None
+    traffic_source_id: int | None
     streams: list[StreamOut]
 
     @classmethod
     def of(cls, c: Campaign) -> "CampaignOut":
         return cls(
             id=c.id, keitaro_id=c.keitaro_id, name=c.name, alias=c.alias, geo=c.geo,
+            domain_id=c.domain_id, group_id=c.group_id, traffic_source_id=c.traffic_source_id,
             streams=[StreamOut.of(s) for s in c.streams],
         )

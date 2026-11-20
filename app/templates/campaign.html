@@ -22,6 +22,17 @@
       <input name="geo" maxlength="2" value="{{ campaign.geo or '' }}" placeholder="—" autocomplete="off" class="geo">
       <span class="hint">Страна в фильтре потока, который ведёт на google.com</span>
     </label>
+    <div class="tracking-row">
+      <label>Домен
+        <select name="domain_id" class="ref-select" disabled><option>Загрузка…</option></select>
+      </label>
+      <label>Группа
+        <select name="group_id" class="ref-select" disabled><option>Загрузка…</option></select>
+      </label>
+      <label>Источник
+        <select name="traffic_source_id" class="ref-select" disabled><option>Загрузка…</option></select>
+      </label>
+    </div>
     <div class="meta">
       <div><span class="muted">ID в Keitaro</span> {{ campaign.keitaro_id }}</div>
       <div><span class="muted">Alias</span> <span id="alias">{{ campaign.alias }}</span></div>

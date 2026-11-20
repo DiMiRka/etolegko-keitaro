@@ -28,12 +28,14 @@ class References:
             "traffic_sources": await self._sources.get(),
         }
 
-    async def check(self, domain_id: int, group_id: int, traffic_source_id: int) -> None:
+    async def check(
+        self, domain_id: int | None = None, group_id: int | None = None, traffic_source_id: int | None = None
+    ) -> None:
         refs = await self.all()
         for key, value, label in (
             ("domains", domain_id, "Домен"),
             ("groups", group_id, "Группа"),
             ("traffic_sources", traffic_source_id, "Источник"),
         ):
-            if not any(i["id"] == value for i in refs[key]):
+            if value is not None and not any(i["id"] == value for i in refs[key]):
                 raise AppError(f"{label} {value} не найден в Keitaro")

@@ -83,10 +83,19 @@ async def get_campaign(campaign_id: int, session: SessionDep):
 
 @router.patch("/campaigns/{campaign_id}", response_model=CampaignOut)
 async def update_campaign(
-    campaign_id: int, body: CampaignUpdate, session: SessionDep, kt: KeitaroDep, settings: SettingsDep
+    campaign_id: int,
+    body: CampaignUpdate,
+    session: SessionDep,
+    kt: KeitaroDep,
+    references: ReferencesDep,
+    settings: SettingsDep,
 ):
     campaign = await svc.load_campaign(session, campaign_id)
-    updated = await campaigns.update_campaign(session, kt, settings, campaign, body.name, body.geo)
+    await references.check(body.domain_id, body.group_id, body.traffic_source_id)
+    updated = await campaigns.update_campaign(
+        session, kt, settings, campaign, body.name, body.geo,
+        body.domain_id, body.group_id, body.traffic_source_id,
+    )
     return CampaignOut.of(updated)
 
 

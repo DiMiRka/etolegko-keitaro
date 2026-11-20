@@ -117,7 +117,15 @@ async def create_campaign(
             raise AppError(f"Не удалось создать потоки ({e}), кампания {campaign_id} осталась в Keitaro") from e
         raise AppError(f"Не удалось создать потоки, кампания удалена: {e}") from e
 
-    campaign = Campaign(keitaro_id=campaign_id, name=created["name"], alias=created["alias"], geo=geo)
+    campaign = Campaign(
+        keitaro_id=campaign_id,
+        name=created["name"],
+        alias=created["alias"],
+        geo=geo,
+        domain_id=tracking.domain_id,
+        group_id=tracking.group_id,
+        traffic_source_id=tracking.traffic_source_id,
+    )
     session.add(campaign)
     await session.commit()
     campaign = await load_campaign(session, campaign.id)
@@ -139,9 +147,21 @@ async def update_campaign(
     campaign: Campaign,
     name: str | None = None,
     geo: str | None = None,
+    domain_id: int | None = None,
+    group_id: int | None = None,
+    traffic_source_id: int | None = None,
 ) -> Campaign:
     new_name = full_name(name, settings.campaign_prefix) if name is not None else None
     new_geo = normalize_geo(geo) if geo is not None else None
+
+    campaign_changes: dict = {}
+    if new_name is not None and new_name != campaign.name:
+        campaign_changes["name"] = new_name
+    for field, value in (
+        ("domain_id", domain_id), ("group_id", group_id), ("traffic_source_id", traffic_source_id)
+    ):
+        if value is not None and value != getattr(campaign, field):
+            campaign_changes[field] = value
 
     geo_stream = None
     if new_geo is not None and new_geo != campaign.geo:
@@ -150,8 +170,8 @@ async def update_campaign(
         if geo_stream is None:
             raise AppError("В кампании нет потока с фильтром по стране, гео поменять нельзя")
 
-    if new_name is not None and new_name != campaign.name:
-        await kt.update_campaign(campaign.keitaro_id, {"name": new_name})
+    if campaign_changes:
+        await kt.update_campaign(campaign.keitaro_id, campaign_changes)
 
     if geo_stream is not None:
         filters = []

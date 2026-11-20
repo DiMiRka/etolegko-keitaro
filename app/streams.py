@@ -116,6 +116,9 @@ async def fetch_streams(session: AsyncSession, kt: KeitaroClient, campaign: Camp
             ) from e
         raise
     campaign.name, campaign.alias = info["name"], info["alias"]
+    campaign.domain_id = info.get("domain_id")
+    campaign.group_id = info.get("group_id")
+    campaign.traffic_source_id = info.get("traffic_source_id")
     campaign.geo = _geo_of(kt_streams) or campaign.geo
     names = await _offer_names(kt)
     now = datetime.now(UTC).replace(tzinfo=None)

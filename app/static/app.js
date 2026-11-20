@@ -70,9 +70,48 @@ var App = (function () {
 
   function shortDay(iso) { return iso.slice(8, 10) + '.' + iso.slice(5, 7); }
 
+  var REFS = [['domain_id', 'domains'], ['group_id', 'groups'], ['traffic_source_id', 'traffic_sources']];
+
+  function fillRefs($f, data) {
+    REFS.forEach(function (ref) {
+      var $sel = field($f, ref[0]).empty();
+      data[ref[1]].forEach(function (item) {
+        $('<option>').val(item.id).text(item.name + ' (#' + item.id + ')').appendTo($sel);
+      });
+      $sel.prop('disabled', false);
+      if (data[ref[1]].length > 8) $sel.select2({width: '100%'});
+    });
+  }
+
+  function setRefs($f, values) {
+    REFS.forEach(function (ref) {
+      var $sel = field($f, ref[0]);
+      var v = values[ref[0]];
+      $sel.find('option.unknown').remove();
+      if (v !== null && v !== undefined && !$sel.find('option[value="' + v + '"]').length) {
+        $('<option class="unknown">').val(v).text('#' + v + ' (нет в списке)').prependTo($sel);
+      }
+      if (v === null || v === undefined) {
+        $('<option class="unknown" value="">').text('—').prependTo($sel);
+        v = '';
+      }
+      $sel.val(String(v)).trigger('change.select2');
+    });
+  }
+
+  function readRefs($f) {
+    var out = {};
+    REFS.forEach(function (ref) {
+      var v = Number(field($f, ref[0]).val());
+      if (v) out[ref[0]] = v;
+    });
+    return out;
+  }
+
   return {
     toast: toast, api: api, busy: busy, offerSelect: offerSelect, field: field,
-    num: num, plural: plural, clicks: clicks, shortDay: shortDay
+    num: num, plural: plural, clicks: clicks, shortDay: shortDay,
+    fillRefs: fillRefs, setRefs: setRefs, readRefs: readRefs
   };
 })();
 
@@ -95,7 +134,7 @@ var Charts = (function () {
 
     var $chart = $('<div class="chart">').attr({role: 'img', 'aria-label': title + '. ' + summary});
     var $plot = $('<div class="chart-plot">');
-    [top, top / 2, 0].forEach(function (t) {
+    [top, top / 2, 0].filter(function (t) { return t === Math.floor(t); }).forEach(function (t) {
       $('<div class="chart-grid">').css('bottom', (t / top * 100) + '%')
         .append($('<span class="chart-tick">').text(App.num(t)))
         .appendTo($plot);
@@ -228,25 +267,13 @@ var CampaignList = (function () {
 })();
 
 var CampaignNew = (function () {
-  var REFS = [['domain_id', 'domains'], ['group_id', 'groups'], ['traffic_source_id', 'traffic_sources']];
-
-  function fillReferences($f, data) {
-    REFS.forEach(function (ref) {
-      var $sel = App.field($f, ref[0]).empty();
-      data[ref[1]].forEach(function (item) {
-        $('<option>').val(item.id).text(item.name + ' (#' + item.id + ')').appendTo($sel);
-      });
-      $sel.val(String(data.defaults[ref[0]]));
-      if ($sel.val() === null && data[ref[1]].length) $sel.val(String(data[ref[1]][0].id));
-      $sel.prop('disabled', false);
-      if (data[ref[1]].length > 8) $sel.select2({width: '100%'});
-    });
-  }
-
   function init() {
     var $f = $('#create-form');
     App.offerSelect(App.field($f, 'offer_id'), 'Поиск оффера по названию или ID');
-    App.api('GET', '/api/references').done(function (data) { fillReferences($f, data); });
+    App.api('GET', '/api/references').done(function (data) {
+      App.fillRefs($f, data);
+      App.setRefs($f, data.defaults);
+    });
     $f.on('submit', function (e) {
       e.preventDefault();
       var body = {
@@ -254,10 +281,7 @@ var CampaignNew = (function () {
         geo: App.field($f, 'geo').val(),
         offer_id: Number(App.field($f, 'offer_id').val())
       };
-      REFS.forEach(function (ref) {
-        var v = Number(App.field($f, ref[0]).val());
-        if (v) body[ref[0]] = v;
-      });
+      $.extend(body, App.readRefs($f));
       if (!body.offer_id) { App.toast('Выберите оффер', true); return; }
       App.busy($f.find('button[type=submit]'), App.api('POST', '/api/campaigns', body)).done(function (c) {
         window.location = '/campaigns/' + c.id;
@@ -450,12 +474,17 @@ var Editor = (function () {
 var CampaignCard = (function () {
   var campaignId;
   var saved = {};
+  var refsLoaded = false;
 
   function showCampaign(c) {
-    saved = {name: c.name, geo: c.geo || ''};
+    saved = {
+      name: c.name, geo: c.geo || '',
+      domain_id: c.domain_id, group_id: c.group_id, traffic_source_id: c.traffic_source_id
+    };
     var $f = $('#main-form');
     App.field($f, 'name').val(saved.name);
     App.field($f, 'geo').val(saved.geo);
+    if (refsLoaded) App.setRefs($f, saved);
     $('#title, #crumb-name').text(c.name);
     $('#alias').text(c.alias);
     document.title = c.name + ' · Keitaro wrapper';
@@ -470,6 +499,11 @@ var CampaignCard = (function () {
     var geo = $.trim(App.field($f, 'geo').val()).toUpperCase();
     if (name !== saved.name) body.name = name;
     if (geo !== saved.geo) body.geo = geo;
+    if (refsLoaded) {
+      $.each(App.readRefs($f), function (key, value) {
+        if (value !== saved[key]) body[key] = value;
+      });
+    }
     return body;
   }
 
@@ -482,7 +516,12 @@ var CampaignCard = (function () {
     $('#stats-refresh').on('click', function () { Stats.load(campaignId); });
 
     var $f = $('#main-form');
-    $f.on('input', 'input', function () {
+    App.api('GET', '/api/references').done(function (data) {
+      App.fillRefs($f, data);
+      refsLoaded = true;
+      App.setRefs($f, saved);
+    });
+    $f.on('input change', 'input, select', function () {
       $f.find('button[type=submit]').prop('disabled', $.isEmptyObject(changes()));
     });
     $f.on('submit', function (e) {
