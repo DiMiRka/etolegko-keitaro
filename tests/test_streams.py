@@ -3,6 +3,7 @@ import unittest
 
 from sqlalchemy.pool import StaticPool
 
+from app import audit
 from app import streams as svc
 from app.db import Base, make_engine, make_sessionmaker
 from app.keitaro import KeitaroError
@@ -51,6 +52,17 @@ class FakeKeitaro:
         self.updates.append((stream_id, payload))
         self.streams[stream_id]["offers"] = [dict(o) for o in payload["offers"]]
         return self.streams[stream_id]
+
+    async def get_stream(self, stream_id):
+        return copy.deepcopy(self.streams[stream_id])
+
+    async def enable_stream(self, stream_id):
+        self.streams[stream_id]["state"] = "active"
+        return [self.streams[stream_id]]
+
+    async def disable_stream(self, stream_id):
+        self.streams[stream_id]["state"] = "disabled"
+        return [self.streams[stream_id]]
 
     def kt_offers(self, stream_id=OFFER_STREAM_ID):
         return {o["offer_id"]: o["share"] for o in self.streams[stream_id]["offers"]}
@@ -284,6 +296,68 @@ class StreamServiceTest(unittest.IsolatedAsyncioTestCase):
         await svc.forget_campaign(self.session, self.campaign)
         with self.assertRaises(svc.NotFound):
             await svc.load_campaign(self.session, self.campaign.id)
+
+    async def log(self):
+        return list(reversed(await audit.history(self.session, self.campaign.id)))
+
+    async def test_journal_records_cycle(self):
+        await svc.add_offer(self.session, self.stream(), 4, "Offer 4")
+        await svc.push(self.session, self.kt, self.stream())
+        await svc.remove_offer(self.session, self.stream(), self.offer(4))
+        await svc.cancel(self.session, self.stream())
+        await svc.set_pin(self.session, self.stream(), self.offer(1), True, 40)
+        entries = await self.log()
+        self.assertEqual(
+            [e["action"] for e in entries], ["import", "fetch", "add", "push", "remove", "cancel", "pin"]
+        )
+        add, push = entries[2], entries[3]
+        self.assertIn("добавлен оффер 4 Offer 4", add["message"])
+        self.assertEqual(add["details"]["before"], {"1": 34, "2": 33, "3": 33})
+        self.assertEqual(add["details"]["after"], {"1": 25, "2": 25, "3": 25, "4": 25})
+        self.assertEqual(push["details"]["before"], {"1": 34, "2": 33, "3": 33})
+        self.assertEqual(entries[-1]["message"], "Поток «Offers»: закреплена доля 40% у оффера 1 Offer 1")
+
+    async def test_cancel_without_changes_not_logged(self):
+        await svc.cancel(self.session, self.stream())
+        self.assertNotIn("cancel", [e["action"] for e in await self.log()])
+
+    async def test_failed_push_logged(self):
+        await svc.add_offer(self.session, self.stream(), 4)
+        self.kt.fail_update = True
+        with self.assertRaises(svc.StreamError):
+            await svc.push(self.session, self.kt, self.stream())
+        last = (await self.log())[-1]
+        self.assertEqual(last["action"], "push_failed")
+        self.assertIn("boom", last["message"])
+
+    async def test_sync_logs_deleted_in_keitaro(self):
+        await svc.add_offer(self.session, self.stream(), 5)
+        self.kt.streams[OFFER_STREAM_ID]["offers"].pop(0)
+        await self.refetch()
+        sync = [e for e in await self.log() if e["action"] == "sync"]
+        self.assertEqual(len(sync), 1)
+        self.assertIn("удалены в Keitaro: 1", sync[0]["message"])
+        self.assertIn("сброшены неопубликованные изменения: 1, 2, 3, 5", sync[0]["message"])
+        self.assertEqual(sync[0]["details"]["removed_in_kt"], [1])
+
+    async def test_stream_state(self):
+        self.assertIsNone(self.stream(GEO_STREAM_ID).state)
+        self.kt.streams[GEO_STREAM_ID]["state"] = "active"
+        await self.refetch()
+        geo = self.stream(GEO_STREAM_ID)
+        self.assertEqual(geo.state, "active")
+        await svc.set_stream_state(self.session, self.kt, geo, False)
+        self.assertEqual((geo.state, self.kt.streams[GEO_STREAM_ID]["state"]), ("disabled", "disabled"))
+        await svc.set_stream_state(self.session, self.kt, geo, True)
+        self.assertEqual(geo.state, "active")
+        self.assertEqual(
+            [e["message"] for e in await self.log() if e["action"] == "stream_state"],
+            ["Поток «Geo»: выключен", "Поток «Geo»: включён"],
+        )
+
+    async def test_forget_campaign_drops_journal(self):
+        await svc.forget_campaign(self.session, self.campaign)
+        self.assertEqual(await audit.history(self.session, self.campaign.id), [])
 
     async def test_import_is_idempotent(self):
         again = await svc.import_campaign(self.session, self.kt, CAMPAIGN_KT_ID)

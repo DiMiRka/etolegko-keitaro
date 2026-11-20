@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 from app.keitaro import KeitaroClient
 
-MEASURES = ["clicks", "campaign_unique_clicks", "conversions", "revenue"]
+MEASURES = ["clicks", "campaign_unique_clicks", "stream_unique_clicks", "bots", "conversions", "revenue"]
 
 
 def day_range(days: int, timezone: str, now: datetime | None = None) -> list[str]:
@@ -21,22 +21,34 @@ def report_body(keitaro_id: int, days: list[str], timezone: str) -> dict:
 
 
 def _bucket(n: int) -> dict:
-    return {"clicks": 0, "unique_clicks": 0, "conversions": 0, "revenue": 0.0, "by_day": [0] * n}
+    return {
+        "clicks": 0, "unique_clicks": 0, "stream_unique_clicks": 0, "bots": 0,
+        "conversions": 0, "revenue": 0.0, "by_day": [0] * n,
+        "_unique_day": [0] * n, "_bots_day": [0] * n,
+    }
 
 
 def _add(bucket: dict, row: dict, index: int) -> None:
     clicks = int(row.get("clicks") or 0)
+    stream_unique = int(row.get("stream_unique_clicks") or 0)
+    bots = int(row.get("bots") or 0)
     bucket["clicks"] += clicks
     bucket["unique_clicks"] += int(row.get("campaign_unique_clicks") or 0)
+    bucket["stream_unique_clicks"] += stream_unique
+    bucket["bots"] += bots
     bucket["conversions"] += int(row.get("conversions") or 0)
     bucket["revenue"] += float(row.get("revenue") or 0)
     bucket["by_day"][index] += clicks
+    bucket["_unique_day"][index] += stream_unique
+    bucket["_bots_day"][index] += bots
 
 
 def _finish(bucket: dict) -> dict:
     bucket["revenue"] = round(bucket["revenue"], 2)
     bucket["cr"] = round(bucket["conversions"] / bucket["clicks"] * 100, 2) if bucket["clicks"] else 0.0
     bucket["today"] = bucket["by_day"][-1]
+    bucket["today_unique"] = bucket.pop("_unique_day")[-1]
+    bucket["today_bots"] = bucket.pop("_bots_day")[-1]
     return bucket
 
 
@@ -119,7 +131,9 @@ async def campaigns_totals(kt: KeitaroClient, keitaro_ids: list[int], days: int,
     for row in report.get("rows") or []:
         bucket = _bucket(1)
         _add(bucket, row, 0)
-        result[int(row["campaign_id"])] = {k: v for k, v in _finish(bucket).items() if k not in ("by_day", "today")}
+        result[int(row["campaign_id"])] = {
+            k: v for k, v in _finish(bucket).items() if k != "by_day" and not k.startswith("today")
+        }
     return result
 
 

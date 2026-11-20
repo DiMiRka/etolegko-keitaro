@@ -102,6 +102,12 @@ class KeitaroClient:
     async def update_stream(self, stream_id: int, payload: dict) -> dict:
         return await self._request("PUT", f"/streams/{stream_id}", json=payload)
 
+    async def enable_stream(self, stream_id: int) -> dict:
+        return await self._request("POST", f"/streams/{stream_id}/enable")
+
+    async def disable_stream(self, stream_id: int) -> dict:
+        return await self._request("POST", f"/streams/{stream_id}/disable")
+
     async def build_report(self, payload: dict) -> dict:
         return await self._request("POST", "/report/build", json=payload)
 

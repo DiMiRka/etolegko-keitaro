@@ -214,6 +214,7 @@ var Stats = (function () {
     ['clicks', 'Клики', function (v) { return App.num(v); }],
     ['unique_clicks', 'Уникальные', function (v) { return App.num(v); }],
     ['conversions', 'Конверсии', function (v) { return App.num(v); }],
+    ['bots', 'Боты', function (v) { return App.num(v); }],
     ['cr', 'CR', function (v) { return App.num(v) + '%'; }],
     ['revenue', 'Доход', function (v) { return '$' + App.num(v); }]
   ];
@@ -381,6 +382,8 @@ var Editor = (function () {
     return {
       clicks: st.clicks,
       today: st.today,
+      todayUnique: st.today_unique || 0,
+      todayBots: st.today_bots || 0,
       offer: function (offerId) {
         var o = st.offers[offerId];
         return o || {clicks: 0, by_day: stats.days.map(function () { return 0; })};
@@ -463,17 +466,34 @@ var Editor = (function () {
   }
 
   function streamCard(s) {
-    var $card = $('<section class="card stream">').attr('data-id', s.id).toggleClass('dirty', s.is_dirty);
+    var off = s.state === 'disabled';
+    var $card = $('<section class="card stream">').attr('data-id', s.id)
+      .toggleClass('dirty', s.is_dirty).toggleClass('off', off);
     var title = 'Поток: ' + s.name + ' (#' + s.position + '), stream_id ' + s.keitaro_id;
     var st = streamStats(s);
-    var $title = $('<div>').append($('<h3>').text(title));
+    var $h3 = $('<h3>').text(title);
+    if (s.state) $h3.append(' ', App.stateBadge(s.state).text(off ? 'Выключен' : 'Включён'));
+    var $title = $('<div>').append($h3);
     if (st) {
       $title.append($('<div class="muted small">').text(
-        'Кликов сегодня: ' + App.num(st.today) + ' · за ' + stats.days.length + ' ' +
+        'Сегодня: ' + App.clicks(st.today) + ', уник. ' + App.num(st.todayUnique) +
+        ', боты ' + App.num(st.todayBots) + ' · за ' + stats.days.length + ' ' +
         App.plural(stats.days.length, 'день', 'дня', 'дней') + ': ' + App.num(st.clicks)
       ));
     }
     var $head = $('<div class="stream-head">').append($title);
+    var $actions = $('<div class="actions">');
+
+    if (s.state) {
+      var $toggle = $('<button class="btn small">').text(off ? 'Включить поток' : 'Выключить поток');
+      $toggle.on('click', function () {
+        if (!off && !confirm('Выключить поток «' + s.name + '»? Трафик пойдёт в следующие потоки')) return;
+        act($toggle, s, '/state', {active: off}).done(function () {
+          App.toast(off ? 'Поток включён' : 'Поток выключен');
+        });
+      });
+      $actions.append($toggle);
+    }
 
     if (s.has_offers) {
       var $push = $('<button class="btn primary small">Опубликовать в Keitaro</button>').prop('disabled', !s.is_dirty);
@@ -482,11 +502,10 @@ var Editor = (function () {
         act($push, s, '/push').done(function () { App.toast('Опубликовано в Keitaro'); });
       });
       $cancel.on('click', function () { act($cancel, s, '/cancel'); });
-      var $actions = $('<div class="actions">');
-      if (s.is_dirty) $actions.append('<span class="badge">не опубликовано</span>');
-      $head.append($actions.append($push, $cancel));
+      if (s.is_dirty) $actions.prepend('<span class="badge">не опубликовано</span>');
+      $actions.append($push, $cancel);
     }
-    $card.append($head);
+    $card.append($head.append($actions));
 
     if (s.last_error) {
       $card.append($('<div class="error-box">').text('Последняя публикация не прошла: ' + s.last_error));
@@ -542,7 +561,9 @@ var Editor = (function () {
   }
 
   function act($btn, s, tail, body) {
-    return App.busy($btn, App.api('POST', streamUrl(s, tail), body)).done(render);
+    return App.busy($btn, App.api('POST', streamUrl(s, tail), body))
+      .done(render)
+      .always(function () { Journal.refresh(); });
   }
 
   return {renderAll: renderAll, setStats: setStats};
@@ -636,6 +657,62 @@ var OfferCard = (function () {
   return {init: init};
 })();
 
+var Journal = (function () {
+  var url = null;
+  var ACTIONS = {
+    create: 'Создание', import: 'Подключение', update: 'Изменение', campaign_state: 'Состояние',
+    fetch: 'Загрузка', sync: 'Синхронизация', add: 'Добавление', remove: 'Удаление',
+    bring_back: 'Возврат', pin: 'Пин', unpin: 'Пин', cancel: 'Отмена', push: 'Публикация',
+    push_failed: 'Ошибка', stream_state: 'Состояние'
+  };
+
+  function when(iso) {
+    var d = new Date(iso.replace(' ', 'T'));
+    if (isNaN(d)) return iso;
+    return d.toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+  }
+
+  function sharesDiff(details) {
+    if (!details || !details.before || !details.after || details.stream === undefined) return null;
+    var keys = {};
+    $.each(details.before, function (k) { keys[k] = true; });
+    $.each(details.after, function (k) { keys[k] = true; });
+    var parts = [];
+    Object.keys(keys).sort(function (a, b) { return a - b; }).forEach(function (k) {
+      var a = details.before[k], b = details.after[k];
+      if (a === b) return;
+      parts.push(k + ': ' + (a === undefined ? '—' : a + '%') + ' → ' + (b === undefined ? '—' : b + '%'));
+    });
+    return parts.length ? 'Доли: ' + parts.join(', ') : null;
+  }
+
+  function render(rows) {
+    var $ol = $('#journal').empty();
+    if (!rows.length) $ol.append('<li class="muted">Пока пусто</li>');
+    rows.forEach(function (r) {
+      var $li = $('<li>').addClass('j-' + r.action);
+      $li.append($('<span class="j-time">').text(when(r.created_at)));
+      $li.append($('<span class="j-action">').text(ACTIONS[r.action] || r.action));
+      var $body = $('<span class="j-body">').append($('<span>').text(r.message));
+      var diff = sharesDiff(r.details);
+      if (diff) $body.append($('<span class="j-diff">').text(diff));
+      $ol.append($li.append($body));
+    });
+  }
+
+  function refresh() {
+    if (!url) return;
+    $.ajax({url: url, dataType: 'json'}).done(render);
+  }
+
+  function init(campaignId) {
+    url = '/api/campaigns/' + campaignId + '/log';
+    refresh();
+  }
+
+  return {init: init, refresh: refresh};
+})();
+
 var CampaignCard = (function () {
   var campaignId;
   var saved = {};
@@ -682,6 +759,7 @@ var CampaignCard = (function () {
   function init(id) {
     campaignId = id;
     var statsUrl = '/api/campaigns/' + id + '/stats';
+    Journal.init(id);
     App.api('GET', '/api/campaigns/' + id).done(function (c) {
       showCampaign(c);
       Stats.load(statsUrl, Editor.setStats);
@@ -702,7 +780,8 @@ var CampaignCard = (function () {
       var body = changes();
       if ($.isEmptyObject(body)) return;
       App.busy($f.find('button[type=submit]'), App.api('PATCH', '/api/campaigns/' + campaignId, body))
-        .done(function (c) { showCampaign(c); App.toast('Сохранено в Keitaro'); });
+        .done(function (c) { showCampaign(c); App.toast('Сохранено в Keitaro'); })
+        .always(Journal.refresh);
     });
 
     $('#fetch').on('click', function () {
@@ -713,7 +792,7 @@ var CampaignCard = (function () {
       App.busy($(this), App.api('POST', '/api/campaigns/' + campaignId + '/fetch')).done(function (c) {
         showCampaign(c);
         App.toast('Потоки обновлены из Keitaro');
-      });
+      }).always(Journal.refresh);
     });
 
     $('#toggle-state').on('click', function () {
@@ -723,7 +802,8 @@ var CampaignCard = (function () {
         .done(function (c) {
           showCampaign(c);
           App.toast(active ? 'Кампания включена' : 'Кампания выключена');
-        });
+        })
+        .always(Journal.refresh);
     });
 
     $('#copy-url').on('click', function () { App.copy($('#campaign-url').val()); });

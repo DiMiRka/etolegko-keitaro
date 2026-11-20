@@ -118,6 +118,16 @@ class EditorApiTest(ApiCase):
         self.assertEqual(data["streams"][str(OFFER_STREAM_ID)]["offers"]["2"]["by_day"][-1], 7)
         self.ok("GET", f"/api/campaigns/{self.campaign_id}/stats", 422, params={"days": 0})
 
+    def test_journal_and_stream_state_api(self):
+        self.ok("POST", f"/api/streams/{self.sid}/offers", json={"offer_id": 4})
+        s = self.ok("POST", f"/api/streams/{self.sid}/state", json={"active": False})
+        self.assertEqual(s["state"], "disabled")
+        log = self.ok("GET", f"/api/campaigns/{self.campaign_id}/log")
+        self.assertEqual([e["action"] for e in log[:2]], ["stream_state", "add"])
+        self.assertTrue(log[0]["created_at"].endswith("Z"))
+        self.ok("GET", "/api/campaigns/999/log", 404)
+        self.ok("POST", "/api/streams/999/state", 404, json={"active": True})
+
     def test_import_unknown_campaign(self):
         self.ok("POST", "/api/campaigns/import", 404, json={"keitaro_id": 1})
 

@@ -66,6 +66,16 @@ class AggregateTest(unittest.TestCase):
         self.assertEqual(offers[1]["cr"], 20.0)
         self.assertEqual(offers[2]["clicks"], 10)
 
+    def test_today_unique_and_bots(self):
+        r = stats.aggregate([
+            {"stream_id": 10, "offer_id": 0, "day": "2026-11-20", "clicks": 9, "stream_unique_clicks": 4, "bots": 2},
+            {"stream_id": 10, "offer_id": 0, "day": "2026-11-19", "clicks": 5, "stream_unique_clicks": 5, "bots": 1},
+        ], DAYS)
+        s = r["streams"][10]
+        self.assertEqual((s["today"], s["today_unique"], s["today_bots"]), (9, 4, 2))
+        self.assertEqual((s["bots"], s["stream_unique_clicks"]), (3, 9))
+        self.assertNotIn("_bots_day", s)
+
     def test_rows_outside_range_ignored(self):
         self.assertNotIn(999, self.result["total"]["by_day"])
 

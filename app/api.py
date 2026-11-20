@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 from sqlalchemy import select
 
-from app import campaigns, stats
+from app import audit, campaigns, stats
 from app import streams as svc
 from app.campaigns import Tracking
 from app.deps import CatalogDep, KeitaroDep, ReferencesDep, SessionDep, SettingsDep
@@ -156,6 +156,12 @@ async def set_campaign_state(campaign_id: int, body: CampaignState, session: Ses
     return CampaignOut.of(await campaigns.set_state(session, kt, campaign, body.active))
 
 
+@router.get("/campaigns/{campaign_id}/log")
+async def campaign_log(campaign_id: int, session: SessionDep):
+    await svc.load_campaign(session, campaign_id)
+    return await audit.history(session, campaign_id)
+
+
 @router.delete("/campaigns/{campaign_id}", status_code=204)
 async def forget_campaign(campaign_id: int, session: SessionDep):
     await svc.forget_campaign(session, await svc.load_campaign(session, campaign_id))
@@ -211,6 +217,13 @@ async def pin_offer(stream_id: int, offer_id: int, body: PinIn, session: Session
 async def cancel(stream_id: int, session: SessionDep):
     stream = await svc.load_stream(session, stream_id)
     await svc.cancel(session, stream)
+    return StreamOut.of(stream)
+
+
+@router.post("/streams/{stream_id}/state", response_model=StreamOut)
+async def set_stream_state(stream_id: int, body: CampaignState, session: SessionDep, kt: KeitaroDep):
+    stream = await svc.load_stream(session, stream_id)
+    await svc.set_stream_state(session, kt, stream, body.active)
     return StreamOut.of(stream)
 
 

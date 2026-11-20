@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import audit
 from app.config import Settings
 from app.errors import AppError
 from app.keitaro import KeitaroClient, KeitaroError
@@ -127,9 +128,16 @@ async def create_campaign(
         traffic_source_id=tracking.traffic_source_id,
     )
     session.add(campaign)
+    await session.flush()
+    audit.record(
+        session, campaign.id, "create",
+        f"Кампания создана в Keitaro: гео {geo} → google.com, остальные → оффер {offer_id}",
+        details={"geo": geo, "offer_id": offer_id, "domain_id": tracking.domain_id,
+                 "group_id": tracking.group_id, "traffic_source_id": tracking.traffic_source_id},
+    )
     await session.commit()
     campaign = await load_campaign(session, campaign.id)
-    return await fetch_streams(session, kt, campaign)
+    return await fetch_streams(session, kt, campaign, log=False)
 
 
 async def set_state(session: AsyncSession, kt: KeitaroClient, campaign: Campaign, active: bool) -> Campaign:
@@ -138,6 +146,10 @@ async def set_state(session: AsyncSession, kt: KeitaroClient, campaign: Campaign
     else:
         await kt.disable_campaign(campaign.keitaro_id)
     apply_campaign_info(campaign, await kt.get_campaign(campaign.keitaro_id))
+    audit.record(
+        session, campaign.id, "campaign_state",
+        "Кампания включена" if campaign.state == "active" else "Кампания выключена",
+    )
     await session.commit()
     return await load_campaign(session, campaign.id)
 
@@ -182,6 +194,11 @@ async def update_campaign(
 
     if campaign_changes:
         await kt.update_campaign(campaign.keitaro_id, campaign_changes)
+        before = {k: getattr(campaign, k) for k in campaign_changes}
+        labels = {"name": "название", "domain_id": "домен", "group_id": "группа", "traffic_source_id": "источник"}
+        changed = ", ".join(f"{labels[k]}: {before[k]} → {v}" for k, v in campaign_changes.items())
+        audit.record(session, campaign.id, "update", f"Изменено в Keitaro: {changed}",
+                     details={"before": before, "after": campaign_changes})
 
     if geo_stream is not None:
         filters = []
@@ -195,5 +212,7 @@ async def update_campaign(
         if geo_stream["name"] == geo_stream_name(old):
             payload["name"] = geo_stream_name(new_geo)
         await kt.update_stream(geo_stream["id"], payload)
+        audit.record(session, campaign.id, "update", f"Изменено в Keitaro: гео {old} → {new_geo}",
+                     details={"before": {"geo": old}, "after": {"geo": new_geo}})
 
-    return await fetch_streams(session, kt, campaign)
+    return await fetch_streams(session, kt, campaign, log=False)

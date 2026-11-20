@@ -82,6 +82,7 @@ class StreamOut(BaseModel):
     name: str
     position: int
     has_offers: bool
+    state: str | None
     is_dirty: bool
     last_error: str | None
     offers: list[StreamOfferOut]
@@ -90,7 +91,7 @@ class StreamOut(BaseModel):
     def of(cls, s: Stream) -> "StreamOut":
         return cls(
             id=s.id, keitaro_id=s.keitaro_id, name=s.name, position=s.position,
-            has_offers=s.has_offers, is_dirty=s.is_dirty, last_error=s.last_error,
+            has_offers=s.has_offers, state=s.state, is_dirty=s.is_dirty, last_error=s.last_error,
             offers=[StreamOfferOut.of(o) for o in s.offers],
         )
 

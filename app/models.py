@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import Enum, ForeignKey, String, Text, UniqueConstraint, false, func
+from sqlalchemy import JSON, Enum, ForeignKey, String, Text, UniqueConstraint, false, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -36,6 +36,18 @@ class Campaign(Base):
     )
 
 
+class ChangeLog(Base):
+    __tablename__ = "change_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), index=True)
+    stream_id: Mapped[int | None] = mapped_column(ForeignKey("streams.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    action: Mapped[str] = mapped_column(String(32))
+    message: Mapped[str] = mapped_column(Text)
+    details: Mapped[dict | None] = mapped_column(JSON)
+
+
 class Stream(Base):
     __tablename__ = "streams"
 
@@ -45,6 +57,7 @@ class Stream(Base):
     name: Mapped[str] = mapped_column(String(255))
     position: Mapped[int] = mapped_column(default=0)
     has_offers: Mapped[bool] = mapped_column(default=False)
+    state: Mapped[str | None] = mapped_column(String(16))
     last_error: Mapped[str | None] = mapped_column(Text)
     fetched_at: Mapped[datetime | None]
 
