@@ -107,8 +107,15 @@ jobs:
 
       - name: Check that only Caddy publishes ports
         run: |
-          test -z "$($COMPOSE port db 5432 2>/dev/null)"
-          test -z "$($COMPOSE port app 8000 2>/dev/null)"
+          for s in caddy app db backup; do
+            ports=$(docker inspect --format '{{json .NetworkSettings.Ports}}' "$($COMPOSE ps -q $s)")
+            echo "$s: $ports"
+            if [ "$s" = caddy ]; then
+              echo "$ports" | grep -q HostPort
+            else
+              ! echo "$ports" | grep -q HostPort
+            fi
+          done
 
       - name: Check backup
         run: |
