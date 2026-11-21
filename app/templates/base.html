@@ -21,6 +21,12 @@
           <span>Офферы</span>
         </a>
       </nav>
+      {% if request.state.user %}
+      <form method="post" action="/logout" class="user-box">
+        <span class="user-name" title="Вы вошли как {{ request.state.user.username }}">{{ request.state.user.username }}</span>
+        <button type="submit" class="logout">Выйти</button>
+      </form>
+      {% endif %}
     </aside>
     <main class="content">
       {% block content %}{% endblock %}

@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import JSON, Enum, ForeignKey, String, Text, UniqueConstraint, false, func
+from sqlalchemy import JSON, Enum, ForeignKey, String, Text, UniqueConstraint, false, func, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -36,6 +36,16 @@ class Campaign(Base):
     )
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(64), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(default=True, server_default=true())
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 class ChangeLog(Base):
     __tablename__ = "change_log"
 
@@ -43,6 +53,7 @@ class ChangeLog(Base):
     campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), index=True)
     stream_id: Mapped[int | None] = mapped_column(ForeignKey("streams.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    username: Mapped[str | None] = mapped_column(String(64))
     action: Mapped[str] = mapped_column(String(32))
     message: Mapped[str] = mapped_column(Text)
     details: Mapped[dict | None] = mapped_column(JSON)

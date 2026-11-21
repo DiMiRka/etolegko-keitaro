@@ -14,6 +14,12 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite+aiosqlite:///./app.db"
 
+    secret_key: str = ""
+    session_ttl_hours: int = 168
+    cookie_secure: bool = False
+    admin_username: str = ""
+    admin_password: str = ""
+
     campaign_prefix: str = "test_mironov_"
     keitaro_domain_id: int = 1813
     keitaro_group_id: int = 10332

@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import current_user
 from app.models import ChangeLog, Stream
 
 
@@ -25,9 +26,11 @@ def record(
     stream: Stream | None = None,
     details: dict | None = None,
 ) -> None:
+    user = current_user.get()
     session.add(ChangeLog(
         campaign_id=campaign_id,
         created_at=datetime.now(UTC).replace(tzinfo=None),
+        username=user.username if user else None,
         stream_id=stream.id if stream is not None else None,
         action=action,
         message=message,
@@ -58,6 +61,7 @@ async def history(session: AsyncSession, campaign_id: int, limit: int = 100) -> 
             "created_at": r.created_at.isoformat(sep=" ", timespec="seconds") + "Z",
             "action": r.action,
             "message": r.message,
+            "username": r.username,
             "stream_id": r.stream_id,
             "details": r.details,
         }

@@ -1,3 +1,9 @@
+$(document).ajaxError(function (e, xhr) {
+  if (xhr.status === 401) {
+    window.location = '/login?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+  }
+});
+
 var App = (function () {
   var toastTimer;
 
@@ -728,7 +734,9 @@ var Journal = (function () {
     if (!rows.length) $ol.append('<li class="muted">Пока пусто</li>');
     rows.forEach(function (r) {
       var $li = $('<li>').addClass('j-' + r.action);
-      $li.append($('<span class="j-time">').text(when(r.created_at)));
+      var $time = $('<span class="j-time">').text(when(r.created_at));
+      if (r.username) $time.append($('<span class="j-user">').text(r.username));
+      $li.append($time);
       $li.append($('<span class="j-action">').text(ACTIONS[r.action] || r.action));
       var $body = $('<span class="j-body">').append($('<span>').text(r.message));
       var diff = sharesDiff(r.details);

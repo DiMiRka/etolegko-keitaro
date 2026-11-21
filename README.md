@@ -18,13 +18,13 @@
 copy .env.example .env            # Linux/macOS: cp .env.example .env
 ```
 
-Впишите в `.env` значение `KEITARO_API_KEY` (в админке Keitaro: Профиль → API ключи), затем:
+Впишите в `.env` значение `KEITARO_API_KEY` (в админке Keitaro: Профиль → API ключи), а также `SECRET_KEY`, `ADMIN_USERNAME` и `ADMIN_PASSWORD` для входа в сервис (см. «Пользователи и вход»). Затем:
 
 ```powershell
 docker compose up -d --build
 ```
 
-Поднимутся PostgreSQL и приложение. При старте контейнер приложения сам применяет миграции (`alembic upgrade head`). Интерфейс откроется на http://localhost:8000, документация API на http://localhost:8000/docs. `DATABASE_URL` из `.env` внутри Docker не используется: приложение подключается к сервису `db`.
+Поднимутся PostgreSQL и приложение. При старте контейнер приложения сам применяет миграции (`alembic upgrade head`) и, если пользователей ещё нет, создаёт первого из `ADMIN_USERNAME` и `ADMIN_PASSWORD`. Интерфейс откроется на http://localhost:8000, документация API на http://localhost:8000/docs. `DATABASE_URL` из `.env` внутри Docker не используется: приложение подключается к сервису `db`.
 
 Если порты 8000 или 5432 заняты, задайте другие:
 
@@ -60,14 +60,30 @@ KEITARO_URL=https://tlgk.host
 KEITARO_API_KEY=ваш_ключ
 ```
 
-Примените миграции и запустите приложение:
+Примените миграции, создайте пользователя и запустите приложение:
 
 ```powershell
 alembic upgrade head
+python -m app.cli create-user admin
 uvicorn app.main:app --reload
 ```
 
-Приложение откроется на http://localhost:8000, документация API на http://localhost:8000/docs.
+Приложение откроется на http://localhost:8000, документация API на http://localhost:8000/docs (тоже после входа).
+
+## Пользователи и вход
+
+Все страницы и API доступны только после входа. Неавторизованного пользователя страницы перенаправляют на `/login?next=…` и после входа возвращают туда, откуда он пришёл. API без входа отвечает `401`. Открыты только `/login`, `/health` и статика.
+
+- Пароли хранятся в виде хеша scrypt с солью. Сессия хранится в cookie `kw_session`, подписанной HMAC-SHA256 ключом `SECRET_KEY` (HttpOnly, SameSite=Lax, срок `SESSION_TTL_HOURS`). Если `SECRET_KEY` не задан, ключ генерируется при старте, и после перезапуска придётся войти заново.
+- Первый пользователь создаётся при старте из `ADMIN_USERNAME` и `ADMIN_PASSWORD`, если в базе ещё нет ни одного пользователя. Остальные создаются командами:
+
+```powershell
+python -m app.cli create-user ivan          # пароль спросит в терминале
+python -m app.cli set-password ivan
+docker compose exec app python -m app.cli create-user ivan   # то же в Docker
+```
+
+- В журнале изменений у каждой записи указан пользователь, который выполнил действие.
 
 ## Локальный запуск с PostgreSQL из Docker
 
@@ -113,6 +129,10 @@ python -m unittest discover -s tests
 | `KEITARO_API_KEY` | — | ключ Admin API |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./app.db` | база приложения |
 | `KEITARO_TIMEZONE` | `Europe/Moscow` | часовой пояс отчётов: границы дней и «сегодня» |
+| `SECRET_KEY` | случайный при старте | ключ подписи cookie сессии |
+| `SESSION_TTL_HOURS` | `168` | сколько часов действует вход |
+| `COOKIE_SECURE` | `false` | `true`, если сервис открыт по https |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | — | первый пользователь, создаётся при старте, если пользователей нет |
 | `CAMPAIGN_PREFIX` | `test_mironov_` | префикс имени новой кампании |
 | `KEITARO_DOMAIN_ID` | `1813` | домен, выбранный в форме создания по умолчанию |
 | `KEITARO_GROUP_ID` | `10332` | группа по умолчанию (FORTESTS) |

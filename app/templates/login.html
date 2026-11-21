@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход · Keitaro wrapper</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}?v={{ asset_version }}">
+</head>
+<body class="login-page">
+  <main class="login-box">
+    <div class="login-brand">Keitaro wrapper</div>
+    <section class="card">
+      <h1>Вход</h1>
+      <form method="post" action="/login" class="form">
+        <input type="hidden" name="next" value="{{ next }}">
+        {% if error %}<div class="error-box" role="alert">{{ error }}</div>{% endif %}
+        <label>Имя пользователя
+          <input name="username" required autocomplete="username" value="{{ username or '' }}" autofocus>
+        </label>
+        <label>Пароль
+          <input name="password" type="password" required autocomplete="current-password">
+        </label>
+        <button type="submit" class="btn primary">Войти</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
