@@ -78,8 +78,8 @@ a:hover { text-decoration: underline; }
 
 @media (max-width: 760px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
-  .sidebar { position: static; height: auto; display: flex; align-items: center; gap: 12px; padding: 8px 16px; }
-  .brand { padding: 4px 0; }
+  .sidebar { position: static; height: auto; flex-direction: row; align-items: center; gap: 12px; padding: 8px 16px; }
+  .brand { padding: 4px 0; white-space: nowrap; }
   .menu { flex-direction: row; }
   .user-box { margin: 0 0 0 auto; padding: 0; border-top: 0; }
   .user-name { display: none; }

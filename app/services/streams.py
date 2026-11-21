@@ -263,7 +263,7 @@ async def remove_offer(session: AsyncSession, stream: Stream, offer: StreamOffer
             stream.offers.insert(index, offer)
         offer.state, offer.share, offer.pinned = before
         raise
-    what = "убран ещё не опубликованный оффер" if unpublished else "оффер перенесён в архив"
+    what = "убран ещё не опубликованный оффер" if unpublished else "удалён оффер (из Keitaro уйдёт при публикации)"
     audit.record_stream(session, stream, "remove", f"{what} {label}", shares_before)
     await session.commit()
 

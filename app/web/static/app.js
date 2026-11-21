@@ -442,7 +442,9 @@ var Editor = (function () {
       .toggleClass('disabled', o.disabled && !removed)
       .toggleClass('changed', o.is_dirty && !removed);
 
-    var note = removed ? ' · в архиве' : (o.disabled ? ' · отключён в Keitaro' : '');
+    var note = removed
+      ? (o.is_dirty ? ' · удалится из Keitaro при публикации' : ' · в архиве')
+      : (o.disabled ? ' · отключён в Keitaro' : '');
     $('<td>')
       .append($('<div class="offer-name">').append(
         $('<a>').attr('href', '/offers/' + o.offer_id).text(o.offer_name || ('Оффер ' + o.offer_id))
