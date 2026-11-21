@@ -118,7 +118,13 @@ jobs:
 
       - name: Logs on failure
         if: failure()
-        run: $COMPOSE logs --no-color
+        run: |
+          $COMPOSE ps -a
+          for c in $($COMPOSE ps -aq); do
+            echo "== $(docker inspect --format '{{.Name}}' "$c")"
+            docker inspect --format '{{json .State.Health}}' "$c"
+          done
+          $COMPOSE logs --no-color
 
       - name: Stop
         if: always()
