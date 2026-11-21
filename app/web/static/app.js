@@ -58,6 +58,8 @@ var App = (function () {
 
   function field($form, name) { return $form.find('[name="' + name + '"]'); }
 
+  function cell(text, cls) { return $('<td>').addClass(cls || '').text(text).attr('title', text); }
+
   function num(n) {
     if (Math.abs(n) >= 10000) {
       return (n / 1000).toLocaleString('ru-RU', {maximumFractionDigits: 1}) + 'K';
@@ -169,7 +171,7 @@ var App = (function () {
   }
 
   return {
-    toast: toast, api: api, busy: busy, offerSelect: offerSelect, field: field,
+    toast: toast, api: api, busy: busy, offerSelect: offerSelect, field: field, cell: cell,
     num: num, plural: plural, clicks: clicks, shortDay: shortDay,
     STATE_LABELS: STATE_LABELS, stateBadge: stateBadge, copy: copy,
     fillRefs: fillRefs, setRefs: setRefs, readRefs: readRefs, groupCreator: groupCreator
@@ -330,10 +332,10 @@ var CampaignList = (function () {
         .prop('disabled', !c.url)
         .on('click', function (e) { e.stopPropagation(); App.copy(c.url); });
       $('<tr>')
-        .append($('<td>').append($('<a>').attr('href', href).text(c.name)))
+        .append($('<td class="cell-name">').append($('<a class="truncate">').attr({href: href, title: c.name}).text(c.name)))
         .append($('<td>').append(App.stateBadge(c.state)))
         .append($('<td>').text(c.geo || '—'))
-        .append($('<td>').text(c.group_id ? (groups[c.group_id] || '#' + c.group_id) : '—'))
+        .append(App.cell(c.group_id ? (groups[c.group_id] || '#' + c.group_id) : '—'))
         .append(statCell(c, 'clicks'))
         .append(statCell(c, 'conversions'))
         .append($('<td class="right num">').text(c.keitaro_id))
@@ -686,10 +688,10 @@ var OfferList = (function () {
       var href = '/offers/' + o.id;
       $('<tr>').toggleClass('muted', o.state !== 'active')
         .append($('<td class="num">').text(o.id))
-        .append($('<td>').append($('<a>').attr('href', href).text(o.name)))
-        .append($('<td>').text(o.group || '—'))
-        .append($('<td>').text(o.countries.join(', ') || '—'))
-        .append($('<td class="num">').text(payout(o)))
+        .append($('<td class="cell-name">').append($('<a class="truncate">').attr({href: href, title: o.name}).text(o.name)))
+        .append(App.cell(o.group || '—'))
+        .append(App.cell(o.countries.join(', ') || '—'))
+        .append(App.cell(payout(o), 'num'))
         .append($('<td class="right num">').text(o.clicks_7d === null ? '—' : App.num(o.clicks_7d)))
         .append($('<td class="right num">').text(o.campaigns_count))
         .on('click', function (e) { if (!$(e.target).is('a')) window.location = href; })

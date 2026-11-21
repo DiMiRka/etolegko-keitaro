@@ -54,7 +54,7 @@ a:hover { text-decoration: underline; }
 .menu-item:hover { background: #1f2937; color: #fff; text-decoration: none; }
 .menu-item.active { background: #1e3a8a; color: #fff; }
 
-.content { padding: 20px 24px; max-width: 1080px; width: 100%; }
+.content { padding: 20px 24px; width: 100%; min-width: 0; }
 
 .sidebar { display: flex; flex-direction: column; }
 .user-box {
@@ -219,7 +219,12 @@ input.geo { text-transform: uppercase; max-width: 160px; }
 }
 .icon-btn:hover:not(:disabled) { color: var(--primary); border-color: var(--border); background: #fff; }
 .icon-btn:disabled { opacity: .35; cursor: default; }
-#campaigns th { white-space: nowrap; }
+#campaigns, #offers { table-layout: fixed; }
+#campaigns { min-width: 860px; }
+#offers { min-width: 760px; }
+#campaigns th, #campaigns td, #offers th, #offers td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#campaigns th:last-child { width: 56px; }
+.truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 760px) { .link-field { flex-basis: 100%; flex-wrap: wrap; } .link-field input { flex-basis: 100%; } }
 
 .state-badge {
