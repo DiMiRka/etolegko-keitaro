@@ -36,6 +36,10 @@ class CampaignImport(BaseModel):
     keitaro_id: int
 
 
+class CampaignImportMany(BaseModel):
+    group_id: int | None = None
+
+
 class CampaignShort(BaseModel):
     id: int
     keitaro_id: int

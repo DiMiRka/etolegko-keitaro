@@ -29,12 +29,31 @@
 </section>
 
 <section class="card">
-  <h2>Подключить кампанию из Keitaro</h2>
-  <p class="muted small">Если кампания уже есть в Keitaro, её можно добавить в список по ID и редактировать её потоки.</p>
-  <form id="import-form" class="inline-form">
-    <input name="keitaro_id" type="number" min="1" required placeholder="ID кампании, например 215444">
-    <button type="submit" class="btn">Подключить</button>
-  </form>
+  <h2>Подключить кампании из Keitaro</h2>
+  <p class="muted small">Если кампания уже есть в Keitaro, её можно добавить в список и редактировать её потоки. Кампании, которые уже в списке, повторно не добавляются.</p>
+
+  <div class="import-row">
+    <span class="import-label">По ID</span>
+    <form id="import-form" class="inline-form">
+      <input name="keitaro_id" type="number" min="1" required placeholder="ID кампании, например 215444">
+      <button type="submit" class="btn">Подключить</button>
+    </form>
+  </div>
+
+  <div class="import-row">
+    <span class="import-label">Группа</span>
+    <form id="import-group-form" class="inline-form">
+      <div class="grow-select"><select name="group_id" disabled><option value="">Загрузка…</option></select></div>
+      <button type="submit" class="btn" disabled>Подключить</button>
+    </form>
+  </div>
+
+  <div class="import-row">
+    <span class="import-label">Все</span>
+    <div class="inline-form">
+      <button type="button" class="btn" id="import-all">Подключить все кампании из Keitaro</button>
+    </div>
+  </div>
 </section>
 {% endblock %}
 

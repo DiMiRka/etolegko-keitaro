@@ -57,6 +57,26 @@ async def import_campaign(session: AsyncSession, kt: KeitaroClient, keitaro_id: 
     return await load_campaign(session, campaign.id)
 
 
+async def import_campaigns(session: AsyncSession, kt: KeitaroClient, group_id: int | None = None) -> dict:
+    remote = await kt.list_campaigns()
+    if group_id is not None:
+        remote = [c for c in remote if c.get("group_id") == group_id]
+    existing = set(await session.scalars(select(Campaign.keitaro_id)))
+    added = []
+    for data in remote:
+        if data["id"] in existing:
+            continue
+        campaign = Campaign(keitaro_id=data["id"], name=data["name"], alias=data["alias"])
+        apply_campaign_info(campaign, data)
+        session.add(campaign)
+        await session.flush()
+        source = f"из группы {data.get('group') or group_id}" if group_id is not None else "вместе со всеми кампаниями"
+        audit.record(session, campaign.id, "import", f"Кампания {data['id']} подключена из Keitaro {source}")
+        added.append(campaign.id)
+    await session.commit()
+    return {"found": len(remote), "added": len(added), "already": len(remote) - len(added)}
+
+
 async def forget_campaign(session: AsyncSession, campaign: Campaign) -> None:
     await session.delete(campaign)
     await session.commit()

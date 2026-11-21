@@ -6,6 +6,7 @@ from app.models import Campaign
 from app.schemas import (
     CampaignCreate,
     CampaignImport,
+    CampaignImportMany,
     CampaignOut,
     CampaignSettingsUpdate,
     CampaignShort,
@@ -61,6 +62,11 @@ async def create_campaign(
 async def import_campaign(body: CampaignImport, session: SessionDep, kt: KeitaroDep):
     campaign = await stream_svc.import_campaign(session, kt, body.keitaro_id)
     return CampaignOut.of(await stream_svc.fetch_streams(session, kt, campaign))
+
+
+@router.post("/import-many")
+async def import_many(body: CampaignImportMany, session: SessionDep, kt: KeitaroDep):
+    return await stream_svc.import_campaigns(session, kt, body.group_id)
 
 
 @router.get("/{campaign_id}", response_model=CampaignOut)

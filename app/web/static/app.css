@@ -247,6 +247,11 @@ input.geo { text-transform: uppercase; max-width: 160px; }
 .props dd { margin: 0; overflow-wrap: anywhere; }
 .chart-title.spaced { margin-top: 16px; }
 #usage tr.removed td { color: var(--removed); }
+.import-row { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 12px; align-items: center; margin-top: 10px; }
+.import-label { font-weight: 500; color: var(--muted); font-size: 13px; }
+.grow-select { flex: 1; min-width: 0; max-width: 320px; }
+.grow-select select { width: 100%; }
+@media (max-width: 760px) { .import-row { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
 .inline-form { display: flex; gap: 8px; flex-wrap: wrap; }
 .inline-form input { flex: 1; min-width: 0; max-width: 320px; }
 

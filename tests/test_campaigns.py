@@ -75,6 +75,9 @@ class FakeKeitaro:
         self.streams.append(stream)
         return stream
 
+    async def list_campaigns(self):
+        return list(self.campaigns.values())
+
     async def list_streams(self, campaign_id):
         return [s for s in self.streams if s["campaign_id"] == campaign_id]
 
@@ -395,6 +398,39 @@ class CampaignApiTest(ApiCase):
         self.assertEqual(log[0]["action"], "settings")
         self.assertIn("валюта: USD → EUR", log[0]["message"])
         self.ok("GET", "/api/campaigns/999/settings", 404)
+
+    def seed_remote(self):
+        for cid, name, group in ((501, "test_mironov_a", 7), (502, "foreign_b", 7), (503, "foreign_c", 2)):
+            self.kt.campaigns[cid] = {
+                "id": cid, "name": name, "alias": f"a{cid}", "group_id": group, "group": "alpha",
+                "domain_id": 1, "traffic_source_id": 3, "state": "active", "domain": "https://kylovoa.com/",
+            }
+
+    def test_import_by_group(self):
+        self.seed_remote()
+        r = self.ok("POST", "/api/campaigns/import-many", json={"group_id": 7})
+        self.assertEqual(r, {"found": 2, "added": 2, "already": 0})
+        listed = {c["keitaro_id"]: c for c in self.ok("GET", "/api/campaigns")}
+        self.assertEqual(set(listed), {501, 502})
+        self.assertEqual((listed[501]["group_id"], listed[501]["url"]), (7, "https://kylovoa.com/a501"))
+        again = self.ok("POST", "/api/campaigns/import-many", json={"group_id": 7})
+        self.assertEqual(again, {"found": 2, "added": 0, "already": 2})
+        log = self.ok("GET", f"/api/campaigns/{listed[501]['id']}/log")
+        self.assertIn("из группы alpha", log[0]["message"])
+
+    def test_import_all(self):
+        self.seed_remote()
+        self.ok("POST", "/api/campaigns/import-many", json={"group_id": 7})
+        r = self.ok("POST", "/api/campaigns/import-many", json={})
+        self.assertEqual(r, {"found": 3, "added": 1, "already": 2})
+        self.assertEqual(len(self.ok("GET", "/api/campaigns")), 3)
+
+    def test_imported_campaign_streams_load_on_fetch(self):
+        self.seed_remote()
+        self.ok("POST", "/api/campaigns/import-many", json={"group_id": 2})
+        cid = self.ok("GET", "/api/campaigns")[0]["id"]
+        self.assertEqual(self.ok("GET", f"/api/campaigns/{cid}")["streams"], [])
+        self.assertEqual(self.ok("POST", f"/api/campaigns/{cid}/fetch")["streams"], [])
 
     def test_create_group_api(self):
         g = self.ok("POST", "/api/groups", 201, json={"name": "mx"})

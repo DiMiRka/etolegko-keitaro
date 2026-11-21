@@ -354,21 +354,58 @@ var CampaignList = (function () {
     });
   }
 
-  function load() {
+  function fillImportGroups(list) {
+    var $f = $('#import-group-form');
+    var $sel = App.field($f, 'group_id').empty();
+    $('<option value="">').text('Выберите группу').appendTo($sel);
+    list.forEach(function (g) { $('<option>').val(g.id).text(g.name + ' (#' + g.id + ')').appendTo($sel); });
+    $sel.prop('disabled', false).select2({width: '100%', placeholder: 'Выберите группу'});
+    $sel.on('change', function () { $f.find('button').prop('disabled', !$sel.val()); });
+  }
+
+  function refresh() {
     App.api('GET', '/api/campaigns').done(function (data) { rows = data; fillGroups(); render(); });
-    App.api('GET', '/api/references').done(function (refs) {
-      refs.groups.forEach(function (g) { groups[g.id] = g.name; });
-      fillGroups();
-      render();
-    });
+    totals = null;
     $.ajax({url: '/api/campaigns/stats', dataType: 'json'})
       .done(function (data) { totals = data.campaigns; })
       .fail(function () { totals = {}; })
       .always(render);
   }
 
+  function load() {
+    refresh();
+    App.api('GET', '/api/references').done(function (refs) {
+      refs.groups.forEach(function (g) { groups[g.id] = g.name; });
+      fillGroups();
+      fillImportGroups(refs.groups);
+      render();
+    });
+  }
+
+  function importMany($btn, body, what) {
+    return App.busy($btn, App.api('POST', '/api/campaigns/import-many', body)).done(function (r) {
+      if (!r.found) {
+        App.toast(what + ': в Keitaro кампаний не найдено');
+        return;
+      }
+      App.toast(what + ': подключено ' + r.added + ' из ' + r.found + (r.already ? ', уже были в списке: ' + r.already : ''));
+      refresh();
+    });
+  }
+
   function init() {
     load();
+    $('#import-group-form').on('submit', function (e) {
+      e.preventDefault();
+      var $sel = App.field($(this), 'group_id');
+      if (!$sel.val()) return;
+      var name = $sel.find(':selected').text();
+      importMany($(this).find('button'), {group_id: Number($sel.val())}, 'Группа ' + name);
+    });
+    $('#import-all').on('click', function () {
+      if (!confirm('Подключить в список все кампании из Keitaro? В общем трекере среди них будут и чужие кампании')) return;
+      importMany($(this), {}, 'Все кампании');
+    });
     $('#f-search').on('input', render);
     $('#f-group, #f-state').on('change', render);
     $('#import-form').on('submit', function (e) {
@@ -910,6 +947,13 @@ var CampaignCard = (function () {
     App.api('GET', '/api/campaigns/' + id).done(function (c) {
       showCampaign(c);
       Stats.load(statsUrl, Editor.setStats);
+      if (!c.streams.length) {
+        $('#streams').html('<p class="muted">Загружаем потоки из Keitaro…</p>');
+        App.api('POST', '/api/campaigns/' + id + '/fetch')
+          .done(function (fresh) { showCampaign(fresh); })
+          .fail(function () { Editor.renderAll([]); })
+          .always(Journal.refresh);
+      }
     });
     $('#stats-refresh').on('click', function () { Stats.load(statsUrl, Editor.setStats); });
 
