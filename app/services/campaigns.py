@@ -146,17 +146,12 @@ SETTINGS_LABELS = {
     "cost_currency": "валюта",
     "cost_auto": "стоимость из параметра cost",
     "traffic_loss": "% потерь",
-    "uniqueness_method": "уникальность",
-    "uniqueness_param": "параметр уникальности",
-    "uniqueness_use_cookies": "уникальность по cookies",
-    "cookies_ttl": "срок уникальности, ч",
     "notes": "заметки",
 }
 
 
 def _settings_of(info: dict) -> dict:
     data = {key: info.get(key) for key in SETTINGS_LABELS}
-    data["uniqueness_param"] = data["uniqueness_param"] or ""
     data["notes"] = data["notes"] or ""
     data["type"] = info.get("type")
     return data
@@ -175,10 +170,6 @@ def _same(a, b) -> bool:
 async def update_settings(session: AsyncSession, kt: KeitaroClient, campaign: Campaign, changes: dict) -> dict:
     current = await campaign_settings(kt, campaign)
     diff = {k: v for k, v in changes.items() if v is not None and not _same(current.get(k), v)}
-    method = diff.get("uniqueness_method", current["uniqueness_method"])
-    param = diff.get("uniqueness_param", current["uniqueness_param"])
-    if method == "param" and not (param or "").strip():
-        raise AppError("Для уникальности по параметру укажите имя параметра")
     if not diff:
         return current
     await kt.update_campaign(campaign.keitaro_id, diff)

@@ -814,11 +814,6 @@ var CampaignSettings = (function () {
     return out;
   }
 
-  function toggleParam() {
-    var $f = $('.settings-form[data-fields*="uniqueness_method"]');
-    $f.find('.param-field').prop('hidden', App.field($f, 'uniqueness_method').val() !== 'param');
-  }
-
   function fill(data) {
     current = data;
     $('#rotation').text(ROTATION[data.type] || data.type || '—');
@@ -828,7 +823,6 @@ var CampaignSettings = (function () {
       $form.find(':input').prop('disabled', false);
       $form.find('button[type=submit]').prop('disabled', true);
     });
-    toggleParam();
   }
 
   function init(campaignId) {
@@ -847,7 +841,6 @@ var CampaignSettings = (function () {
       var $form = $(this);
       $form.on('input change', ':input', function () {
         if (current) $form.find('button[type=submit]').prop('disabled', $.isEmptyObject(diff($form)));
-        toggleParam();
       });
       $form.on('submit', function (e) {
         e.preventDefault();

@@ -29,7 +29,6 @@
   <div class="tabs" role="tablist">
     <button type="button" class="tab active" role="tab" data-tab="general" aria-selected="true">Общие</button>
     <button type="button" class="tab" role="tab" data-tab="costs" aria-selected="false">Затраты</button>
-    <button type="button" class="tab" role="tab" data-tab="uniqueness" aria-selected="false">Уникальность</button>
     <button type="button" class="tab" role="tab" data-tab="notes" aria-selected="false">Заметки</button>
   </div>
 
@@ -91,32 +90,6 @@
       </label>
       <label class="check">
         <input name="cost_auto" type="checkbox"> Брать стоимость из параметра cost
-      </label>
-      <div class="form-actions">
-        <button type="submit" class="btn primary" disabled>Сохранить</button>
-        <span class="hint">Изменения сразу сохраняются в Keitaro</span>
-      </div>
-    </form>
-  </div>
-
-  <div class="tab-panel" data-panel="uniqueness" role="tabpanel" hidden>
-    <form class="form grid-form settings-form" data-fields="uniqueness_method,uniqueness_param,cookies_ttl,uniqueness_use_cookies">
-      <label>Определять уникальность по
-        <select name="uniqueness_method">
-          <option value="ip_ua">IP и user-agent</option>
-          <option value="ip">IP</option>
-          <option value="param">Параметру</option>
-        </select>
-        <span class="hint">Keitaro определяет уникальность клика по этой настройке</span>
-      </label>
-      <label>Срок уникальности, часов
-        <input name="cookies_ttl" type="number" min="1" max="8760" step="1">
-      </label>
-      <label class="param-field">Имя параметра
-        <input name="uniqueness_param" maxlength="100" autocomplete="off" placeholder="например sub_id">
-      </label>
-      <label class="check">
-        <input name="uniqueness_use_cookies" type="checkbox"> Учитывать cookies
       </label>
       <div class="form-actions">
         <button type="submit" class="btn primary" disabled>Сохранить</button>

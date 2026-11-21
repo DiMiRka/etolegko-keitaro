@@ -29,10 +29,6 @@ class CampaignSettingsUpdate(BaseModel):
     cost_currency: Literal["USD", "EUR", "RUB", "UAH", "GBP"] | None = None
     cost_auto: bool | None = None
     traffic_loss: float | None = Field(default=None, ge=0, lt=100)
-    uniqueness_method: Literal["ip_ua", "ip", "param"] | None = None
-    uniqueness_param: str | None = Field(default=None, max_length=100)
-    uniqueness_use_cookies: bool | None = None
-    cookies_ttl: int | None = Field(default=None, ge=1, le=8760)
     notes: str | None = Field(default=None, max_length=5000)
 
 

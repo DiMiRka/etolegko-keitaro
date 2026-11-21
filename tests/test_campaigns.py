@@ -255,11 +255,11 @@ class UpdateCampaignTest(DbCase):
 
     async def test_settings_roundtrip(self):
         self.kt.campaigns[self.campaign.keitaro_id].update(
-            uniqueness_method="ip", uniqueness_param=None, uniqueness_use_cookies=True,
-            cookies_ttl=24, traffic_loss=0, notes=None,
+            uniqueness_method="ip", cookies_ttl=24, traffic_loss=0, notes=None,
         )
         s = await campaigns.campaign_settings(self.kt, self.campaign)
-        self.assertEqual((s["type"], s["cost_type"], s["notes"], s["uniqueness_param"]), ("position", "CPC", "", ""))
+        self.assertEqual((s["type"], s["cost_type"], s["notes"]), ("position", "CPC", ""))
+        self.assertNotIn("uniqueness_method", s)
 
         calls = []
         original = self.kt.update_campaign
@@ -270,22 +270,13 @@ class UpdateCampaignTest(DbCase):
 
         self.kt.update_campaign = spy
         s = await campaigns.update_settings(self.session, self.kt, self.campaign, {
-            "cost_value": 0.0, "cost_type": "CPM", "notes": "hello", "cookies_ttl": 48,
+            "cost_value": 0.0, "cost_type": "CPM", "notes": "hello", "traffic_loss": 5,
         })
-        self.assertEqual(calls, [{"cost_type": "CPM", "notes": "hello", "cookies_ttl": 48}])
-        self.assertEqual((s["cost_type"], s["notes"], s["cookies_ttl"]), ("CPM", "hello", 48))
+        self.assertEqual(calls, [{"cost_type": "CPM", "notes": "hello", "traffic_loss": 5}])
+        self.assertEqual((s["cost_type"], s["notes"], s["traffic_loss"]), ("CPM", "hello", 5))
 
         await campaigns.update_settings(self.session, self.kt, self.campaign, {"cost_type": "CPM"})
         self.assertEqual(len(calls), 1)
-
-    async def test_param_uniqueness_requires_name(self):
-        self.kt.campaigns[self.campaign.keitaro_id].update(uniqueness_method="ip", uniqueness_param="")
-        with self.assertRaises(AppError):
-            await campaigns.update_settings(self.session, self.kt, self.campaign, {"uniqueness_method": "param"})
-        s = await campaigns.update_settings(
-            self.session, self.kt, self.campaign, {"uniqueness_method": "param", "uniqueness_param": "sub_id"}
-        )
-        self.assertEqual((s["uniqueness_method"], s["uniqueness_param"]), ("param", "sub_id"))
 
     async def test_fetch_derives_geo(self):
         self.campaign.geo = None
@@ -397,7 +388,9 @@ class CampaignApiTest(ApiCase):
         self.assertEqual((s["cost_currency"], s["traffic_loss"]), ("EUR", 5))
         self.ok("PATCH", url, 422, json={"cost_type": "CPA"})
         self.ok("PATCH", url, 422, json={"traffic_loss": 100})
-        self.ok("PATCH", url, 422, json={"cookies_ttl": 0})
+        self.ok("PATCH", url, 422, json={"cost_value": -1})
+        self.ok("PATCH", url, json={"uniqueness_method": "param", "cookies_ttl": 1})
+        self.assertNotIn("uniqueness_method", self.kt.campaigns[created["keitaro_id"]])
         log = self.ok("GET", f"/api/campaigns/{created['id']}/log")
         self.assertEqual(log[0]["action"], "settings")
         self.assertIn("валюта: USD → EUR", log[0]["message"])
