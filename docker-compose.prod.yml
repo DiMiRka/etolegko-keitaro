@@ -132,6 +132,7 @@ networks:
     ipam:
       config:
         - subnet: 172.30.57.0/24
+          ip_range: 172.30.57.128/25
   backend:
     internal: true
 
