@@ -663,7 +663,7 @@ var Journal = (function () {
     create: 'Создание', import: 'Подключение', update: 'Изменение', campaign_state: 'Состояние',
     fetch: 'Загрузка', sync: 'Синхронизация', add: 'Добавление', remove: 'Удаление',
     bring_back: 'Возврат', pin: 'Пин', unpin: 'Пин', cancel: 'Отмена', push: 'Публикация',
-    push_failed: 'Ошибка', stream_state: 'Состояние'
+    push_failed: 'Ошибка', stream_state: 'Состояние', settings: 'Настройки'
   };
 
   function when(iso) {
@@ -713,6 +713,98 @@ var Journal = (function () {
   return {init: init, refresh: refresh};
 })();
 
+var Tabs = {
+  init: function ($root) {
+    $root.find('.tab').on('click', function () {
+      var name = $(this).data('tab');
+      $root.find('.tab').removeClass('active').attr('aria-selected', 'false');
+      $(this).addClass('active').attr('aria-selected', 'true');
+      $root.find('.tab-panel').prop('hidden', true).filter('[data-panel="' + name + '"]').prop('hidden', false);
+    });
+  }
+};
+
+var CampaignSettings = (function () {
+  var url;
+  var current = null;
+  var ROTATION = {position: 'по позиции', weight: 'по весу'};
+
+  function read($input) {
+    if ($input.is(':checkbox')) return $input.prop('checked');
+    if ($input.attr('type') === 'number') {
+      var v = $input.val();
+      return v === '' ? null : Number(v);
+    }
+    return $input.val();
+  }
+
+  function write($input, value) {
+    if ($input.is(':checkbox')) $input.prop('checked', !!value);
+    else $input.val(value === null || value === undefined ? '' : value);
+  }
+
+  function fields($form) { return String($form.data('fields')).split(','); }
+
+  function diff($form) {
+    var out = {};
+    fields($form).forEach(function (name) {
+      var v = read(App.field($form, name));
+      var c = current[name];
+      var same = (typeof v === 'number' && typeof c === 'number') ? v === c : v === (c === null ? '' : c);
+      if (v !== null && !same) out[name] = v;
+    });
+    return out;
+  }
+
+  function toggleParam() {
+    var $f = $('.settings-form[data-fields*="uniqueness_method"]');
+    $f.find('.param-field').prop('hidden', App.field($f, 'uniqueness_method').val() !== 'param');
+  }
+
+  function fill(data) {
+    current = data;
+    $('#rotation').text(ROTATION[data.type] || data.type || '—');
+    $('.settings-form').each(function () {
+      var $form = $(this);
+      fields($form).forEach(function (name) { write(App.field($form, name), data[name]); });
+      $form.find(':input').prop('disabled', false);
+      $form.find('button[type=submit]').prop('disabled', true);
+    });
+    toggleParam();
+  }
+
+  function init(campaignId) {
+    url = '/api/campaigns/' + campaignId + '/settings';
+    $('.settings-form :input').prop('disabled', true);
+    $.ajax({url: url, dataType: 'json'}).done(fill).fail(function () {
+      $('#rotation').text('—');
+      $('.settings-form').each(function () {
+        if (!$(this).find('.load-error').length) {
+          $(this).prepend('<p class="muted load-error">Не удалось загрузить настройки из Keitaro</p>');
+        }
+      });
+    });
+
+    $('.settings-form').each(function () {
+      var $form = $(this);
+      $form.on('input change', ':input', function () {
+        if (current) $form.find('button[type=submit]').prop('disabled', $.isEmptyObject(diff($form)));
+        toggleParam();
+      });
+      $form.on('submit', function (e) {
+        e.preventDefault();
+        var body = diff($form);
+        if ($.isEmptyObject(body)) return;
+        App.busy($form.find('button[type=submit]'), App.api('PATCH', url, body))
+          .done(function (data) { fill(data); App.toast('Сохранено в Keitaro'); })
+          .always(Journal.refresh);
+      });
+    });
+  }
+
+  return {init: init};
+})();
+
 var CampaignCard = (function () {
   var campaignId;
   var saved = {};
@@ -760,6 +852,8 @@ var CampaignCard = (function () {
     campaignId = id;
     var statsUrl = '/api/campaigns/' + id + '/stats';
     Journal.init(id);
+    Tabs.init($('.tabs').closest('.card'));
+    CampaignSettings.init(id);
     App.api('GET', '/api/campaigns/' + id).done(function (c) {
       showCampaign(c);
       Stats.load(statsUrl, Editor.setStats);

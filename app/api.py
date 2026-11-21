@@ -15,6 +15,7 @@ from app.schemas import (
     CampaignCreate,
     CampaignImport,
     CampaignOut,
+    CampaignSettingsUpdate,
     CampaignShort,
     CampaignState,
     CampaignUpdate,
@@ -154,6 +155,19 @@ async def update_campaign(
 async def set_campaign_state(campaign_id: int, body: CampaignState, session: SessionDep, kt: KeitaroDep):
     campaign = await svc.load_campaign(session, campaign_id)
     return CampaignOut.of(await campaigns.set_state(session, kt, campaign, body.active))
+
+
+@router.get("/campaigns/{campaign_id}/settings")
+async def get_campaign_settings(campaign_id: int, session: SessionDep, kt: KeitaroDep):
+    return await campaigns.campaign_settings(kt, await svc.load_campaign(session, campaign_id))
+
+
+@router.patch("/campaigns/{campaign_id}/settings")
+async def update_campaign_settings(
+    campaign_id: int, body: CampaignSettingsUpdate, session: SessionDep, kt: KeitaroDep
+):
+    campaign = await svc.load_campaign(session, campaign_id)
+    return await campaigns.update_settings(session, kt, campaign, body.model_dump(exclude_none=True))
 
 
 @router.get("/campaigns/{campaign_id}/log")

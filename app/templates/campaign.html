@@ -26,7 +26,14 @@
 </section>
 
 <section class="card">
-  <h2>Основное</h2>
+  <div class="tabs" role="tablist">
+    <button type="button" class="tab active" role="tab" data-tab="general" aria-selected="true">Общие</button>
+    <button type="button" class="tab" role="tab" data-tab="costs" aria-selected="false">Затраты</button>
+    <button type="button" class="tab" role="tab" data-tab="uniqueness" aria-selected="false">Уникальность</button>
+    <button type="button" class="tab" role="tab" data-tab="notes" aria-selected="false">Заметки</button>
+  </div>
+
+  <div class="tab-panel" data-panel="general" role="tabpanel">
   <form id="main-form" class="form grid-form">
     <label>Название
       <input name="name" required value="{{ campaign.name }}" autocomplete="off">
@@ -50,12 +57,85 @@
     <div class="meta">
       <div><span class="muted">ID в Keitaro</span> {{ campaign.keitaro_id }}</div>
       <div><span class="muted">Alias</span> <span id="alias">{{ campaign.alias }}</span></div>
+      <div title="Создаватор и логика потоков рассчитаны на ротацию по позиции, поэтому здесь она не меняется">
+        <span class="muted">Ротация потоков</span> <span id="rotation">…</span>
+      </div>
     </div>
     <div class="form-actions">
       <button type="submit" class="btn primary" disabled>Сохранить</button>
       <span class="hint">Изменения сразу сохраняются в Keitaro</span>
     </div>
   </form>
+  </div>
+
+  <div class="tab-panel" data-panel="costs" role="tabpanel" hidden>
+    <form class="form grid-form settings-form" data-fields="cost_type,cost_value,cost_currency,cost_auto,traffic_loss">
+      <label>Модель затрат
+        <select name="cost_type">
+          <option value="CPC">CPC (оплата за клик)</option>
+          <option value="CPUC">CPUC (оплата за уникальный клик)</option>
+          <option value="CPM">CPM (оплата за 1000 показов)</option>
+        </select>
+      </label>
+      <label>% потерь
+        <input name="traffic_loss" type="number" min="0" max="99" step="0.01">
+        <span class="hint">CPC = OriginalCPC / (1 − потери / 100)</span>
+      </label>
+      <label>Стоимость
+        <input name="cost_value" type="number" min="0" step="0.0001">
+      </label>
+      <label>Валюта
+        <select name="cost_currency">
+          <option>USD</option><option>EUR</option><option>RUB</option><option>UAH</option><option>GBP</option>
+        </select>
+      </label>
+      <label class="check">
+        <input name="cost_auto" type="checkbox"> Брать стоимость из параметра cost
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="btn primary" disabled>Сохранить</button>
+        <span class="hint">Изменения сразу сохраняются в Keitaro</span>
+      </div>
+    </form>
+  </div>
+
+  <div class="tab-panel" data-panel="uniqueness" role="tabpanel" hidden>
+    <form class="form grid-form settings-form" data-fields="uniqueness_method,uniqueness_param,cookies_ttl,uniqueness_use_cookies">
+      <label>Определять уникальность по
+        <select name="uniqueness_method">
+          <option value="ip_ua">IP и user-agent</option>
+          <option value="ip">IP</option>
+          <option value="param">Параметру</option>
+        </select>
+        <span class="hint">Keitaro определяет уникальность клика по этой настройке</span>
+      </label>
+      <label>Срок уникальности, часов
+        <input name="cookies_ttl" type="number" min="1" max="8760" step="1">
+      </label>
+      <label class="param-field">Имя параметра
+        <input name="uniqueness_param" maxlength="100" autocomplete="off" placeholder="например sub_id">
+      </label>
+      <label class="check">
+        <input name="uniqueness_use_cookies" type="checkbox"> Учитывать cookies
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="btn primary" disabled>Сохранить</button>
+        <span class="hint">Изменения сразу сохраняются в Keitaro</span>
+      </div>
+    </form>
+  </div>
+
+  <div class="tab-panel" data-panel="notes" role="tabpanel" hidden>
+    <form class="form settings-form" data-fields="notes">
+      <label>Заметки
+        <textarea name="notes" rows="6" maxlength="5000" placeholder="Видны в Keitaro на вкладке «Заметки»"></textarea>
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="btn primary" disabled>Сохранить</button>
+        <span class="hint">Изменения сразу сохраняются в Keitaro</span>
+      </div>
+    </form>
+  </div>
 </section>
 
 <section class="card">

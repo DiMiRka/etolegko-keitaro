@@ -18,6 +18,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -148,6 +149,24 @@ input.geo { text-transform: uppercase; max-width: 160px; }
 
 .search { width: min(320px, 100%); }
 
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: -4px 0 16px; overflow-x: auto; overflow-y: hidden; }
+.tab {
+  font: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 8px 12px;
+  margin-bottom: -1px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--text); font-weight: 600; border-bottom-color: var(--primary); }
+.form label.check { flex-direction: row; align-items: center; gap: 8px; font-weight: 400; grid-column: 1 / -1; }
+.form textarea { font: inherit; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; resize: vertical; width: 100%; }
+.load-error { grid-column: 1 / -1; margin: 0; }
+
 .campaign-bar { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 .state-field { display: flex; gap: 8px; align-items: center; }
 .link-field { display: flex; gap: 8px; align-items: center; flex: 1; min-width: 0; }
@@ -222,7 +241,7 @@ input.geo { text-transform: uppercase; max-width: 160px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 .card-head h2 { margin: 0; }
 
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin-bottom: 16px; }
 .tile { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
 .tile-label { font-size: 12px; color: var(--muted); }
 .tile-value { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }

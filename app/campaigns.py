@@ -140,6 +140,65 @@ async def create_campaign(
     return await fetch_streams(session, kt, campaign, log=False)
 
 
+SETTINGS_LABELS = {
+    "cost_type": "модель затрат",
+    "cost_value": "стоимость",
+    "cost_currency": "валюта",
+    "cost_auto": "стоимость из параметра cost",
+    "traffic_loss": "% потерь",
+    "uniqueness_method": "уникальность",
+    "uniqueness_param": "параметр уникальности",
+    "uniqueness_use_cookies": "уникальность по cookies",
+    "cookies_ttl": "срок уникальности, ч",
+    "notes": "заметки",
+}
+
+
+def _settings_of(info: dict) -> dict:
+    data = {key: info.get(key) for key in SETTINGS_LABELS}
+    data["uniqueness_param"] = data["uniqueness_param"] or ""
+    data["notes"] = data["notes"] or ""
+    data["type"] = info.get("type")
+    return data
+
+
+async def campaign_settings(kt: KeitaroClient, campaign: Campaign) -> dict:
+    return _settings_of(await kt.get_campaign(campaign.keitaro_id))
+
+
+def _same(a, b) -> bool:
+    if isinstance(a, int | float) and isinstance(b, int | float) and not isinstance(a, bool):
+        return float(a) == float(b)
+    return a == b
+
+
+async def update_settings(session: AsyncSession, kt: KeitaroClient, campaign: Campaign, changes: dict) -> dict:
+    current = await campaign_settings(kt, campaign)
+    diff = {k: v for k, v in changes.items() if v is not None and not _same(current.get(k), v)}
+    method = diff.get("uniqueness_method", current["uniqueness_method"])
+    param = diff.get("uniqueness_param", current["uniqueness_param"])
+    if method == "param" and not (param or "").strip():
+        raise AppError("Для уникальности по параметру укажите имя параметра")
+    if not diff:
+        return current
+    await kt.update_campaign(campaign.keitaro_id, diff)
+
+    def show(key, value):
+        if key == "notes":
+            return f"{len(value or '')} симв."
+        if isinstance(value, bool):
+            return "да" if value else "нет"
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        return value if value not in (None, "") else "—"
+
+    message = ", ".join(f"{SETTINGS_LABELS[k]}: {show(k, current.get(k))} → {show(k, v)}" for k, v in diff.items())
+    audit.record(session, campaign.id, "settings", f"Изменено в Keitaro: {message}",
+                 details={"before": {k: current.get(k) for k in diff}, "after": diff})
+    await session.commit()
+    return await campaign_settings(kt, campaign)
+
+
 async def set_state(session: AsyncSession, kt: KeitaroClient, campaign: Campaign, active: bool) -> Campaign:
     if active:
         await kt.enable_campaign(campaign.keitaro_id)
