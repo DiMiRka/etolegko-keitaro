@@ -4,13 +4,13 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import audit
-from app.config import Settings
-from app.errors import AppError
+from app.core.config import Settings
+from app.core.errors import AppError
 from app.keitaro import KeitaroClient, KeitaroError
 from app.models import Campaign
-from app.offers import OfferCatalog
-from app.streams import apply_campaign_info, fetch_streams, load_campaign
+from app.services import audit
+from app.services.offers import OfferCatalog
+from app.services.streams import apply_campaign_info, fetch_streams, load_campaign
 
 GEO_RE = re.compile(r"^[A-Z]{2}$")
 

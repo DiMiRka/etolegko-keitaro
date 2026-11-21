@@ -1,7 +1,7 @@
 import unittest
 
-from app import stats
 from app.keitaro import KeitaroError
+from app.services import stats
 from tests.helpers import ApiCase
 from tests.test_editor_api import EditorKeitaro
 from tests.test_streams import CAMPAIGN_KT_ID, OFFER_STREAM_ID

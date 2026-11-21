@@ -3,13 +3,13 @@ import unittest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 
-from app import auth
-from app.config import Settings
-from app.db import Base, make_engine, make_sessionmaker
-from app.deps import get_catalog, get_keitaro, get_references, get_session, settings_dep
+from app.api.deps import get_catalog, get_keitaro, get_references, get_session, settings_dep
+from app.core.config import Settings
+from app.core.db import Base, make_engine, make_sessionmaker
 from app.main import app
-from app.offers import OfferCatalog
-from app.references import References
+from app.services import users
+from app.services.offers import OfferCatalog
+from app.services.references import References
 
 SETTINGS = Settings(
     _env_file=None, keitaro_api_key="x", campaign_prefix="test_mironov_",
@@ -29,7 +29,7 @@ class ApiCase(unittest.TestCase):
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         async with make_sessionmaker(engine)() as session:
-            await auth.create_user(session, USERNAME, PASSWORD)
+            await users.create_user(session, USERNAME, PASSWORD)
         return engine
 
     def setUp(self):

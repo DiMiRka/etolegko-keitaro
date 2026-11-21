@@ -1,6 +1,6 @@
 import unittest
 
-from app.weights import Entry, WeightError, compute_shares
+from app.services.weights import Entry, WeightError, compute_shares
 
 
 def free(n=1, share=0):

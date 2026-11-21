@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import current_user
+from app.core.security import current_user
 from app.models import ChangeLog, Stream
 
 

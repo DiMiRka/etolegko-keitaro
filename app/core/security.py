@@ -7,12 +7,6 @@ import time
 from contextvars import ContextVar
 from dataclasses import dataclass
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.errors import AppError
-from app.models import User
-
 COOKIE_NAME = "kw_session"
 MIN_PASSWORD_LENGTH = 8
 _SCRYPT = {"n": 2**14, "r": 8, "p": 1}
@@ -86,39 +80,3 @@ def safe_next(path: str | None) -> str:
     if not path or not path.startswith("/") or path.startswith("//") or "\\" in path:
         return "/"
     return path
-
-
-async def authenticate(session: AsyncSession, username: str, password: str) -> CurrentUser | None:
-    user = await session.scalar(select(User).where(func.lower(User.username) == username.strip().lower()))
-    if user is None or not user.is_active or not verify_password(password, user.password_hash):
-        return None
-    return CurrentUser(user.id, user.username)
-
-
-async def create_user(session: AsyncSession, username: str, password: str) -> User:
-    username = username.strip()
-    if not username:
-        raise AppError("Укажите имя пользователя")
-    if len(password) < MIN_PASSWORD_LENGTH:
-        raise AppError(f"Пароль должен быть не короче {MIN_PASSWORD_LENGTH} символов")
-    exists = await session.scalar(select(User.id).where(func.lower(User.username) == username.lower()))
-    if exists is not None:
-        raise AppError(f"Пользователь {username} уже есть")
-    user = User(username=username, password_hash=hash_password(password), is_active=True)
-    session.add(user)
-    await session.commit()
-    return user
-
-
-async def set_password(session: AsyncSession, username: str, password: str) -> None:
-    if len(password) < MIN_PASSWORD_LENGTH:
-        raise AppError(f"Пароль должен быть не короче {MIN_PASSWORD_LENGTH} символов")
-    user = await session.scalar(select(User).where(func.lower(User.username) == username.strip().lower()))
-    if user is None:
-        raise AppError(f"Пользователя {username} нет")
-    user.password_hash = hash_password(password)
-    await session.commit()
-
-
-async def users_count(session: AsyncSession) -> int:
-    return await session.scalar(select(func.count(User.id))) or 0

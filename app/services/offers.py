@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.cache import CachedList
+from app.core.cache import CachedList
 from app.keitaro import KeitaroClient
 from app.models import Campaign, Stream, StreamOffer
 

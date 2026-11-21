@@ -3,10 +3,10 @@ import asyncio
 import getpass
 import sys
 
-from app import auth
-from app.config import get_settings
-from app.db import make_engine, make_sessionmaker
-from app.errors import AppError
+from app.core.config import get_settings
+from app.core.db import make_engine, make_sessionmaker
+from app.core.errors import AppError
+from app.services import users
 
 
 def _password(args) -> str:
@@ -23,10 +23,10 @@ async def _run(args) -> None:
     try:
         async with make_sessionmaker(engine)() as session:
             if args.command == "create-user":
-                await auth.create_user(session, args.username, _password(args))
+                await users.create_user(session, args.username, _password(args))
                 print(f"Пользователь {args.username} создан")
             elif args.command == "set-password":
-                await auth.set_password(session, args.username, _password(args))
+                await users.set_password(session, args.username, _password(args))
                 print(f"Пароль пользователя {args.username} обновлён")
     finally:
         await engine.dispose()

@@ -2,7 +2,7 @@ import unittest
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
-from app import stats
+from app.services import stats
 
 DAYS = ["2026-11-18", "2026-11-19", "2026-11-20"]
 

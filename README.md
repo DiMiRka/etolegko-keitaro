@@ -236,19 +236,38 @@ Keitaro сам сумму долей не проверяет (принимает
 
 ```
 app/
-  main.py        приложение, обработчики ошибок
-  config.py      настройки из .env
-  db.py, models.py
-  keitaro.py     async-клиент Keitaro Admin API
-  weights.py     пересчёт долей
-  streams.py     fetch / add / remove / bring back / pin / cancel / push
-  campaigns.py   создаватор кампаний
-  offers.py      кэш и поиск офферов
-  api.py, web.py JSON API и страницы
-  templates/, static/
-migrations/      Alembic
-tests/
+  main.py             сборка приложения: lifespan, проверка входа, обработчики ошибок
+  cli.py              python -m app.cli: создание пользователей и смена пароля
+  core/               то, что не зависит от предметной области
+    config.py         настройки из .env
+    db.py             движок и сессии SQLAlchemy
+    errors.py         AppError, NotFound, Conflict → 400 / 404 / 409
+    security.py       хеш паролей (scrypt), подписанный токен сессии, текущий пользователь
+    cache.py          простой TTL-кэш списков
+  keitaro/client.py   async-клиент Keitaro Admin API (httpx)
+  models/             таблицы: campaign, stream (Stream, StreamOffer), user, change_log
+  schemas/            pydantic-схемы запросов и ответов API
+  services/           бизнес-логика, не знает про HTTP
+    weights.py        пересчёт долей с пинами
+    streams.py        fetch / add / remove / bring back / pin / cancel / push, проверка конфликтов
+    campaigns.py      создаватор, изменение кампании и её настроек, включение и выключение
+    stats.py          отчёты Keitaro: кампания, потоки, офферы
+    offers.py         каталог офферов и где они используются
+    references.py     домены, группы, источники; создание групп
+    audit.py          журнал изменений
+    users.py          пользователи: вход, создание, смена пароля
+  api/                JSON API, по роутеру на раздел: campaigns, streams, offers, references; deps.py
+  web/                всё, что относится к HTML-интерфейсу
+    pages.py          страницы
+    auth.py           вход и выход
+    templating.py     Jinja2 и пути к шаблонам и статике
+    templates/        Jinja2-шаблоны
+    static/           app.js (jQuery) и app.css
+migrations/           Alembic
+tests/                unittest; фейковый Keitaro и SQLite в памяти
 ```
+
+Зависимости идут в одну сторону: `api` и `web` → `services` → `models`, `keitaro`, `core`. Сервисы не импортируют ничего из FastAPI, поэтому их тестируют напрямую, без HTTP.
 
 ## Замечания
 

@@ -102,7 +102,7 @@ class EditorApiTest(ApiCase):
         self.assertIn("больше нет в Keitaro", r["detail"])
 
     def test_stats(self):
-        from app.stats import day_range
+        from app.services.stats import day_range
 
         today = day_range(1, "Europe/Moscow")[0]
 

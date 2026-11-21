@@ -3,11 +3,11 @@ import unittest
 
 from sqlalchemy.pool import StaticPool
 
-from app import audit
-from app import streams as svc
-from app.db import Base, make_engine, make_sessionmaker
+from app.core.db import Base, make_engine, make_sessionmaker
 from app.keitaro import KeitaroError
 from app.models import Campaign, OfferState
+from app.services import audit
+from app.services import streams as svc
 
 CAMPAIGN_KT_ID = 500
 GEO_STREAM_ID = 10

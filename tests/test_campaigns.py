@@ -2,12 +2,12 @@ import unittest
 
 from sqlalchemy.pool import StaticPool
 
-from app import campaigns
-from app.db import Base, make_engine, make_sessionmaker
-from app.errors import AppError
+from app.core.db import Base, make_engine, make_sessionmaker
+from app.core.errors import AppError
 from app.keitaro import KeitaroError
-from app.offers import OfferCatalog
-from app.references import References
+from app.services import campaigns
+from app.services.offers import OfferCatalog
+from app.services.references import References
 from tests.helpers import SETTINGS, ApiCase
 
 

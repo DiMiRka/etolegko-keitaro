@@ -1,7 +1,6 @@
 import logging
 import secrets
 from contextlib import asynccontextmanager
-from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import FastAPI, Request
@@ -10,16 +9,18 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app import auth
 from app.api import router as api_router
-from app.config import get_settings
-from app.db import make_engine, make_sessionmaker
-from app.deps import SessionDep
-from app.errors import AppError, Conflict, NotFound
+from app.api.deps import SessionDep
+from app.core import security
+from app.core.config import get_settings
+from app.core.db import make_engine, make_sessionmaker
+from app.core.errors import AppError, Conflict, NotFound
 from app.keitaro import KeitaroClient, KeitaroError
-from app.offers import OfferCatalog
-from app.references import References
+from app.services import users
+from app.services.offers import OfferCatalog
+from app.services.references import References
 from app.web import router as web_router
+from app.web.templating import STATIC_DIR
 
 log = logging.getLogger("app")
 PUBLIC_PATHS = {"/login", "/health"}
@@ -30,8 +31,8 @@ async def bootstrap_admin(sessionmaker, username: str, password: str) -> None:
         return
     try:
         async with sessionmaker() as session:
-            if await auth.users_count(session) == 0:
-                await auth.create_user(session, username, password)
+            if await users.users_count(session) == 0:
+                await users.create_user(session, username, password)
                 log.warning("Создан первый пользователь %s из ADMIN_USERNAME / ADMIN_PASSWORD", username)
     except (SQLAlchemyError, AppError) as e:
         log.warning("Не удалось создать первого пользователя: %s", e)
@@ -60,7 +61,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Keitaro wrapper", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.include_router(api_router)
 app.include_router(web_router)
 
@@ -68,18 +69,18 @@ app.include_router(web_router)
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     path = request.url.path
-    user = auth.read_token(request.cookies.get(auth.COOKIE_NAME), request.app.state.secret_key)
+    user = security.read_token(request.cookies.get(security.COOKIE_NAME), request.app.state.secret_key)
     request.state.user = user
     if user is None and path not in PUBLIC_PATHS and not path.startswith("/static/"):
         if path.startswith("/api/"):
             return JSONResponse({"detail": "Нужно войти в сервис"}, status_code=401)
         target = path + (f"?{request.url.query}" if request.url.query else "")
         return RedirectResponse(f"/login?next={quote(target, safe='')}", status_code=303)
-    token = auth.current_user.set(user)
+    token = security.current_user.set(user)
     try:
         return await call_next(request)
     finally:
-        auth.current_user.reset(token)
+        security.current_user.reset(token)
 
 
 @app.exception_handler(AppError)

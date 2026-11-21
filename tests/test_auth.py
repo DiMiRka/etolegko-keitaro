@@ -6,55 +6,57 @@ from unittest import mock
 
 from sqlalchemy.pool import StaticPool
 
-from app import auth, cli
-from app.config import Settings
-from app.db import Base, make_engine, make_sessionmaker
-from app.errors import AppError
+from app import cli
+from app.core import security
+from app.core.config import Settings
+from app.core.db import Base, make_engine, make_sessionmaker
+from app.core.errors import AppError
+from app.services import users
 from tests.helpers import USERNAME, ApiCase
 from tests.test_editor_api import EditorKeitaro
 from tests.test_streams import CAMPAIGN_KT_ID
 
 SECRET = "s3cret"
-USER = auth.CurrentUser(7, "dima")
+USER = security.CurrentUser(7, "dima")
 
 
 class PasswordTest(unittest.TestCase):
     def test_roundtrip(self):
-        stored = auth.hash_password("correct horse")
+        stored = security.hash_password("correct horse")
         self.assertTrue(stored.startswith("scrypt$"))
         self.assertNotIn("correct horse", stored)
-        self.assertTrue(auth.verify_password("correct horse", stored))
-        self.assertFalse(auth.verify_password("wrong horse", stored))
+        self.assertTrue(security.verify_password("correct horse", stored))
+        self.assertFalse(security.verify_password("wrong horse", stored))
 
     def test_salted(self):
-        self.assertNotEqual(auth.hash_password("same"), auth.hash_password("same"))
+        self.assertNotEqual(security.hash_password("same"), security.hash_password("same"))
 
     def test_malformed_hash(self):
         for stored in ("", "plain", "md5$1$2$3$aa$bb", "scrypt$x$8$1$zz$yy"):
-            self.assertFalse(auth.verify_password("x", stored))
+            self.assertFalse(security.verify_password("x", stored))
 
 
 class TokenTest(unittest.TestCase):
     def test_roundtrip(self):
-        token = auth.make_token(USER, SECRET, 60, now=1000)
-        self.assertEqual(auth.read_token(token, SECRET, now=1030), USER)
+        token = security.make_token(USER, SECRET, 60, now=1000)
+        self.assertEqual(security.read_token(token, SECRET, now=1030), USER)
 
     def test_expired(self):
-        token = auth.make_token(USER, SECRET, 60, now=1000)
-        self.assertIsNone(auth.read_token(token, SECRET, now=1061))
+        token = security.make_token(USER, SECRET, 60, now=1000)
+        self.assertIsNone(security.read_token(token, SECRET, now=1061))
 
     def test_tampered_or_foreign(self):
-        token = auth.make_token(USER, SECRET, 60, now=1000)
+        token = security.make_token(USER, SECRET, 60, now=1000)
         payload, sig = token.rsplit(".", 1)
-        forged = auth.make_token(auth.CurrentUser(1, "admin"), SECRET, 60, now=1000).rsplit(".", 1)[0]
+        forged = security.make_token(security.CurrentUser(1, "admin"), SECRET, 60, now=1000).rsplit(".", 1)[0]
         for bad in (None, "", "junk", f"{forged}.{sig}", f"{payload}.{sig[:-1]}x"):
-            self.assertIsNone(auth.read_token(bad, SECRET, now=1000))
-        self.assertIsNone(auth.read_token(token, "other", now=1000))
+            self.assertIsNone(security.read_token(bad, SECRET, now=1000))
+        self.assertIsNone(security.read_token(token, "other", now=1000))
 
     def test_safe_next(self):
-        self.assertEqual(auth.safe_next("/campaigns/2?x=1"), "/campaigns/2?x=1")
+        self.assertEqual(security.safe_next("/campaigns/2?x=1"), "/campaigns/2?x=1")
         for bad in (None, "", "https://evil.com", "//evil.com", "/\\evil.com", "campaigns"):
-            self.assertEqual(auth.safe_next(bad), "/")
+            self.assertEqual(security.safe_next(bad), "/")
 
 
 class UsersTest(unittest.IsolatedAsyncioTestCase):
@@ -69,31 +71,31 @@ class UsersTest(unittest.IsolatedAsyncioTestCase):
         await self.engine.dispose()
 
     async def test_create_and_authenticate(self):
-        await auth.create_user(self.session, "Dima", "long enough")
-        self.assertEqual((await auth.authenticate(self.session, "dima", "long enough")).username, "Dima")
-        self.assertIsNone(await auth.authenticate(self.session, "dima", "nope"))
-        self.assertIsNone(await auth.authenticate(self.session, "ghost", "long enough"))
+        await users.create_user(self.session, "Dima", "long enough")
+        self.assertEqual((await users.authenticate(self.session, "dima", "long enough")).username, "Dima")
+        self.assertIsNone(await users.authenticate(self.session, "dima", "nope"))
+        self.assertIsNone(await users.authenticate(self.session, "ghost", "long enough"))
 
     async def test_validation(self):
         with self.assertRaises(AppError):
-            await auth.create_user(self.session, "a", "short")
+            await users.create_user(self.session, "a", "short")
         with self.assertRaises(AppError):
-            await auth.create_user(self.session, "  ", "long enough")
-        await auth.create_user(self.session, "a", "long enough")
+            await users.create_user(self.session, "  ", "long enough")
+        await users.create_user(self.session, "a", "long enough")
         with self.assertRaises(AppError):
-            await auth.create_user(self.session, "A", "long enough")
+            await users.create_user(self.session, "A", "long enough")
 
     async def test_inactive_user_cannot_login(self):
-        user = await auth.create_user(self.session, "b", "long enough")
+        user = await users.create_user(self.session, "b", "long enough")
         user.is_active = False
         await self.session.commit()
-        self.assertIsNone(await auth.authenticate(self.session, "b", "long enough"))
+        self.assertIsNone(await users.authenticate(self.session, "b", "long enough"))
 
     async def test_set_password(self):
-        await auth.create_user(self.session, "c", "long enough")
-        await auth.set_password(self.session, "c", "brand new pass")
-        self.assertIsNotNone(await auth.authenticate(self.session, "c", "brand new pass"))
-        self.assertIsNone(await auth.authenticate(self.session, "c", "long enough"))
+        await users.create_user(self.session, "c", "long enough")
+        await users.set_password(self.session, "c", "brand new pass")
+        self.assertIsNotNone(await users.authenticate(self.session, "c", "brand new pass"))
+        self.assertIsNone(await users.authenticate(self.session, "c", "long enough"))
 
 
 class CliTest(unittest.TestCase):
@@ -141,7 +143,7 @@ class AccessTest(ApiCase):
         r = self.login(password="nope")
         self.assertEqual(r.status_code, 401)
         self.assertIn("Неверное имя пользователя или пароль", r.text)
-        self.assertNotIn(auth.COOKIE_NAME, self.client.cookies)
+        self.assertNotIn(security.COOKIE_NAME, self.client.cookies)
         self.assertEqual(self.client.get("/api/campaigns").status_code, 401)
 
     def test_login_logout(self):
