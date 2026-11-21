@@ -35,6 +35,10 @@ class CampaignSettingsUpdate(BaseModel):
     notes: str | None = Field(default=None, max_length=5000)
 
 
+class GroupCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
 class CampaignState(BaseModel):
     active: bool
 

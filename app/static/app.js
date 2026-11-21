@@ -117,6 +117,42 @@ var App = (function () {
     });
   }
 
+  function groupCreator($f) {
+    var $sel = field($f, 'group_id');
+    var $label = $sel.closest('label');
+    if ($label.find('.inline-create').length) return;
+    var $open = $('<button type="button" class="link-btn">+ Новая группа</button>');
+    var $input = $('<input type="text" maxlength="100" placeholder="Название, например campaigns_mx" autocomplete="off">');
+    var $create = $('<button type="button" class="btn small primary">Создать</button>');
+    var $cancel = $('<button type="button" class="btn small">Отмена</button>');
+    var $box = $('<div class="inline-create" hidden>').append($input, $create, $cancel);
+    $label.append($open, $box);
+
+    function close() { $box.prop('hidden', true); $open.prop('hidden', false); $input.val(''); }
+    $open.on('click', function (e) {
+      e.preventDefault();
+      $open.prop('hidden', true);
+      $box.prop('hidden', false);
+      $input.trigger('focus');
+    });
+    $cancel.on('click', function (e) { e.preventDefault(); close(); });
+    $create.on('click', function (e) {
+      e.preventDefault();
+      var name = $.trim($input.val());
+      if (!name) { toast('Укажите название группы', true); return; }
+      busy($create, api('POST', '/api/groups', {name: name})).done(function (g) {
+        $('<option>').val(g.id).text(g.name + ' (#' + g.id + ')').appendTo($sel);
+        $sel.val(String(g.id)).trigger('change');
+        close();
+        toast('Группа «' + g.name + '» создана в Keitaro');
+      });
+    });
+    $input.on('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); $create.trigger('click'); }
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+    });
+  }
+
   function readRefs($f) {
     var out = {};
     REFS.forEach(function (ref) {
@@ -130,7 +166,7 @@ var App = (function () {
     toast: toast, api: api, busy: busy, offerSelect: offerSelect, field: field,
     num: num, plural: plural, clicks: clicks, shortDay: shortDay,
     STATE_LABELS: STATE_LABELS, stateBadge: stateBadge, copy: copy,
-    fillRefs: fillRefs, setRefs: setRefs, readRefs: readRefs
+    fillRefs: fillRefs, setRefs: setRefs, readRefs: readRefs, groupCreator: groupCreator
   };
 })();
 
@@ -349,6 +385,7 @@ var CampaignNew = (function () {
     App.api('GET', '/api/references').done(function (data) {
       App.fillRefs($f, data);
       App.setRefs($f, data.defaults);
+      App.groupCreator($f);
     });
     $f.on('submit', function (e) {
       e.preventDefault();
@@ -865,6 +902,7 @@ var CampaignCard = (function () {
       App.fillRefs($f, data);
       refsLoaded = true;
       App.setRefs($f, saved);
+      App.groupCreator($f);
     });
     $f.on('input change', 'input, select', function () {
       $f.find('button[type=submit]').prop('disabled', $.isEmptyObject(changes()));

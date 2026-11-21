@@ -13,6 +13,7 @@ def _active(items: list[dict]) -> list[dict]:
 
 class References:
     def __init__(self, kt: KeitaroClient, ttl: float = 300.0):
+        self._kt = kt
         self._domains = CachedList(lambda: self._fetch(kt.list_domains), ttl)
         self._groups = CachedList(lambda: self._fetch(kt.list_campaign_groups), ttl)
         self._sources = CachedList(lambda: self._fetch(kt.list_traffic_sources), ttl)
@@ -27,6 +28,18 @@ class References:
             "groups": sorted(await self._groups.get(), key=lambda g: g["name"].lower()),
             "traffic_sources": await self._sources.get(),
         }
+
+    async def create_group(self, name: str) -> dict:
+        name = name.strip()
+        if not name:
+            raise AppError("Укажите название группы")
+        self._groups.invalidate()
+        existing = next((g for g in await self._groups.get() if g["name"].lower() == name.lower()), None)
+        if existing is not None:
+            raise AppError(f"Группа «{existing['name']}» уже есть (#{existing['id']}), выберите её в списке")
+        created = await self._kt.create_campaign_group(name)
+        self._groups.invalidate()
+        return {"id": created["id"], "name": created.get("name") or name}
 
     async def check(
         self, domain_id: int | None = None, group_id: int | None = None, traffic_source_id: int | None = None

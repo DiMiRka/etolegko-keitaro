@@ -166,6 +166,20 @@ input.geo { text-transform: uppercase; max-width: 160px; }
 .form label.check { flex-direction: row; align-items: center; gap: 8px; font-weight: 400; grid-column: 1 / -1; }
 .form textarea { font: inherit; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; resize: vertical; width: 100%; }
 .load-error { grid-column: 1 / -1; margin: 0; }
+.link-btn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--primary);
+  cursor: pointer;
+  align-self: flex-start;
+}
+.link-btn:hover { text-decoration: underline; }
+.inline-create { display: flex; gap: 6px; flex-wrap: wrap; font-weight: 400; }
+.inline-create input { flex: 1; min-width: 140px; }
 
 .campaign-bar { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 .state-field { display: flex; gap: 8px; align-items: center; }

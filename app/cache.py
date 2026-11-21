@@ -11,6 +11,9 @@ class CachedList:
         self._loaded_at: float | None = None
         self._lock = asyncio.Lock()
 
+    def invalidate(self) -> None:
+        self._loaded_at = None
+
     async def get(self) -> list[dict]:
         async with self._lock:
             if self._loaded_at is None or time.monotonic() - self._loaded_at > self._ttl:

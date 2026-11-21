@@ -19,6 +19,7 @@ from app.schemas import (
     CampaignShort,
     CampaignState,
     CampaignUpdate,
+    GroupCreate,
     OfferAdd,
     OfferOut,
     PinIn,
@@ -98,6 +99,11 @@ async def get_references(references: ReferencesDep, settings: SettingsDep):
             "traffic_source_id": defaults.traffic_source_id,
         },
     }
+
+
+@router.post("/groups", status_code=201)
+async def create_group(body: GroupCreate, references: ReferencesDep, settings: SettingsDep):
+    return await references.create_group(campaigns.full_name(body.name, settings.campaign_prefix))
 
 
 @router.post("/campaigns", response_model=CampaignOut, status_code=201)

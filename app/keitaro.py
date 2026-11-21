@@ -120,5 +120,8 @@ class KeitaroClient:
     async def list_campaign_groups(self) -> list[dict]:
         return await self._request("GET", "/groups", params={"type": "campaigns"})
 
+    async def create_campaign_group(self, name: str) -> dict:
+        return await self._request("POST", "/groups", json={"name": name, "type": "campaigns"})
+
     async def list_traffic_sources(self) -> list[dict]:
         return await self._request("GET", "/traffic_sources")

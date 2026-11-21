@@ -19,6 +19,8 @@ class FakeKeitaro:
         self.offer_calls = 0
         self.reference_calls = 0
         self.state_calls = []
+        self.groups = [{"id": 2, "name": "FORTESTS"}, {"id": 7, "name": "alpha"}]
+        self.groups_forbidden = False
         self.reports = []
         self.fail_stream_n = fail_stream_n
         self.fail_delete = fail_delete
@@ -40,7 +42,14 @@ class FakeKeitaro:
         ]
 
     async def list_campaign_groups(self):
-        return [{"id": 2, "name": "FORTESTS"}, {"id": 7, "name": "alpha"}]
+        return list(self.groups)
+
+    async def create_campaign_group(self, name):
+        if self.groups_forbidden:
+            raise KeitaroError("Keitaro HTTP 403: You have no permission to access this page - Groups", 403)
+        group = {"id": 100 + len(self.groups), "name": name, "type": "campaigns"}
+        self.groups.append(group)
+        return group
 
     async def list_traffic_sources(self):
         return [{"id": 3, "name": "FORTESTS", "state": "active"}]
@@ -306,6 +315,22 @@ class ReferencesTest(unittest.IsolatedAsyncioTestCase):
         await refs.check(1, 2, 3)
         self.assertEqual(kt.reference_calls, 1)
 
+    async def test_create_group_refreshes_cache(self):
+        refs = References(FakeKeitaro())
+        await refs.all()
+        g = await refs.create_group("  test_mironov_g1 ")
+        self.assertEqual(g["name"], "test_mironov_g1")
+        self.assertIn(g["id"], [x["id"] for x in (await refs.all())["groups"]])
+        await refs.check(group_id=g["id"])
+
+    async def test_create_group_rejects_duplicates(self):
+        refs = References(FakeKeitaro())
+        with self.assertRaises(AppError) as ctx:
+            await refs.create_group("FORTESTS")
+        self.assertIn("#2", str(ctx.exception))
+        with self.assertRaises(AppError):
+            await refs.create_group("   ")
+
 
 class OfferCatalogTest(unittest.IsolatedAsyncioTestCase):
     async def test_search_by_name_and_id(self):
@@ -377,6 +402,21 @@ class CampaignApiTest(ApiCase):
         self.assertEqual(log[0]["action"], "settings")
         self.assertIn("валюта: USD → EUR", log[0]["message"])
         self.ok("GET", "/api/campaigns/999/settings", 404)
+
+    def test_create_group_api(self):
+        g = self.ok("POST", "/api/groups", 201, json={"name": "mx"})
+        self.assertEqual(g["name"], "test_mironov_mx")
+        self.ok("POST", "/api/groups", 400, json={"name": "test_mironov_mx"})
+        self.ok("POST", "/api/groups", 422, json={"name": ""})
+        created = self.ok("POST", "/api/campaigns", 201, json={
+            "name": "grp", "geo": "AU", "offer_id": 18813, "group_id": g["id"],
+        })
+        self.assertEqual(self.kt.campaigns[created["keitaro_id"]]["group_id"], g["id"])
+
+    def test_create_group_forbidden(self):
+        self.kt.groups_forbidden = True
+        r = self.ok("POST", "/api/groups", 502, json={"name": "nope"})
+        self.assertIn("403", r["detail"])
 
     def test_list_stats_without_campaigns(self):
         self.assertEqual(self.ok("GET", "/api/campaigns/stats")["campaigns"], {})
