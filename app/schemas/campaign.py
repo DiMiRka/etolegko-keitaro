@@ -40,6 +40,10 @@ class CampaignImportMany(BaseModel):
     group_id: int | None = None
 
 
+class CampaignIds(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=1000)
+
+
 class CampaignShort(BaseModel):
     id: int
     keitaro_id: int

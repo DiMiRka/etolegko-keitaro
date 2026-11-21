@@ -17,13 +17,19 @@
 </div>
 
 <section class="card flush">
+  <div class="bulk-bar" id="bulk-bar" hidden>
+    <span id="bulk-count"></span>
+    <button type="button" class="btn danger" id="bulk-forget" title="Убрать выбранные кампании из списка сервиса, в Keitaro ничего не меняется">Убрать из списка</button>
+    <button type="button" class="btn" id="bulk-clear">Снять выделение</button>
+  </div>
   <div class="table-wrap">
     <table class="table clickable" id="campaigns">
       <thead><tr>
+        <th class="cell-check"><label><input type="checkbox" id="check-all" aria-label="Выделить все показанные"></label></th>
         <th>Название</th><th>Состояние</th><th>Гео</th><th>Группа</th>
         <th class="right">Клики 7д</th><th class="right">Конв.</th><th class="right">ID</th><th></th>
       </tr></thead>
-      <tbody><tr><td colspan="8" class="muted">Загрузка…</td></tr></tbody>
+      <tbody><tr><td colspan="9" class="muted">Загрузка…</td></tr></tbody>
     </table>
   </div>
 </section>

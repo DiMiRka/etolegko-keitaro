@@ -82,6 +82,14 @@ async def forget_campaign(session: AsyncSession, campaign: Campaign) -> None:
     await session.commit()
 
 
+async def forget_campaigns(session: AsyncSession, ids: list[int]) -> int:
+    campaigns = list(await session.scalars(select(Campaign).where(Campaign.id.in_(set(ids)))))
+    for campaign in campaigns:
+        await session.delete(campaign)
+    await session.commit()
+    return len(campaigns)
+
+
 async def _offer_names(kt: KeitaroClient) -> dict[int, str]:
     try:
         return {o["id"]: o["name"] for o in await kt.list_offers()}

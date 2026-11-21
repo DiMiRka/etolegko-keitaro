@@ -5,6 +5,7 @@ from app.api.deps import CatalogDep, Days, KeitaroDep, ReferencesDep, SessionDep
 from app.models import Campaign
 from app.schemas import (
     CampaignCreate,
+    CampaignIds,
     CampaignImport,
     CampaignImportMany,
     CampaignOut,
@@ -67,6 +68,11 @@ async def import_campaign(body: CampaignImport, session: SessionDep, kt: Keitaro
 @router.post("/import-many")
 async def import_many(body: CampaignImportMany, session: SessionDep, kt: KeitaroDep):
     return await stream_svc.import_campaigns(session, kt, body.group_id)
+
+
+@router.post("/forget")
+async def forget_many(body: CampaignIds, session: SessionDep):
+    return {"removed": await stream_svc.forget_campaigns(session, body.ids)}
 
 
 @router.get("/{campaign_id}", response_model=CampaignOut)

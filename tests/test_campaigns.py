@@ -425,6 +425,16 @@ class CampaignApiTest(ApiCase):
         self.assertEqual(r, {"found": 3, "added": 1, "already": 2})
         self.assertEqual(len(self.ok("GET", "/api/campaigns")), 3)
 
+    def test_forget_many(self):
+        self.seed_remote()
+        self.ok("POST", "/api/campaigns/import-many", json={})
+        ids = [c["id"] for c in self.ok("GET", "/api/campaigns")]
+        r = self.ok("POST", "/api/campaigns/forget", json={"ids": ids[:2] + [ids[0], 9999]})
+        self.assertEqual(r, {"removed": 2})
+        self.assertEqual([c["id"] for c in self.ok("GET", "/api/campaigns")], ids[2:])
+        self.ok("GET", f"/api/campaigns/{ids[0]}/log", 404)
+        self.ok("POST", "/api/campaigns/forget", 422, json={"ids": []})
+
     def test_imported_campaign_streams_load_on_fetch(self):
         self.seed_remote()
         self.ok("POST", "/api/campaigns/import-many", json={"group_id": 2})

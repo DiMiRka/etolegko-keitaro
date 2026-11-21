@@ -301,6 +301,22 @@ var CampaignList = (function () {
   var rows = null;
   var groups = {};
   var totals = null;
+  var shown = [];
+  var selected = {};
+
+  function selectedIds() {
+    return shown.filter(function (c) { return selected[c.id]; }).map(function (c) { return c.id; });
+  }
+
+  function updateBulk() {
+    var n = selectedIds().length;
+    $('#bulk-bar').prop('hidden', !n);
+    $('#bulk-count').text('Выбрано: ' + n);
+    $('#check-all')
+      .prop('checked', n > 0 && n === shown.length)
+      .prop('indeterminate', n > 0 && n < shown.length)
+      .prop('disabled', !shown.length);
+  }
 
   function statCell(c, key) {
     if (totals === null) return $('<td class="right num muted">').text('…');
@@ -313,14 +329,18 @@ var CampaignList = (function () {
     var q = $.trim($('#f-search').val()).toLowerCase();
     var group = $('#f-group').val();
     var state = $('#f-state').val();
-    var shown = rows.filter(function (c) {
+    shown = rows.filter(function (c) {
       return (!q || c.name.toLowerCase().indexOf(q) >= 0 || String(c.keitaro_id).indexOf(q) === 0) &&
         (!group || String(c.group_id) === group) &&
         (!state || c.state === state);
     });
+    var kept = {};
+    shown.forEach(function (c) { if (selected[c.id]) kept[c.id] = true; });
+    selected = kept;
     var $tb = $('#campaigns tbody').empty();
+    updateBulk();
     if (!shown.length) {
-      $tb.append($('<tr><td colspan="8" class="muted"></td></tr>').find('td').text(rows.length
+      $tb.append($('<tr><td colspan="9" class="muted"></td></tr>').find('td').text(rows.length
         ? 'Ничего не найдено'
         : 'Пока пусто: создайте новую кампанию или подключите существующую').end());
     }
@@ -331,7 +351,17 @@ var CampaignList = (function () {
         .attr('aria-label', 'Скопировать ссылку кампании')
         .prop('disabled', !c.url)
         .on('click', function (e) { e.stopPropagation(); App.copy(c.url); });
-      $('<tr>')
+      var $tr = $('<tr>').toggleClass('selected', !!selected[c.id]);
+      var $check = $('<input type="checkbox">')
+        .attr('aria-label', 'Выделить ' + c.name)
+        .prop('checked', !!selected[c.id])
+        .on('change', function () {
+          if (this.checked) selected[c.id] = true; else delete selected[c.id];
+          $tr.toggleClass('selected', this.checked);
+          updateBulk();
+        });
+      $tr
+        .append($('<td class="cell-check">').append($('<label>').append($check)))
         .append($('<td class="cell-name">').append($('<a class="truncate">').attr({href: href, title: c.name}).text(c.name)))
         .append($('<td>').append(App.stateBadge(c.state)))
         .append($('<td>').text(c.geo || '—'))
@@ -340,8 +370,19 @@ var CampaignList = (function () {
         .append(statCell(c, 'conversions'))
         .append($('<td class="right num">').text(c.keitaro_id))
         .append($('<td class="right">').append($copy))
-        .on('click', function (e) { if (!$(e.target).closest('a, button').length) window.location = href; })
+        .on('click', function (e) { if (!$(e.target).closest('a, button, label').length) window.location = href; })
         .appendTo($tb);
+    });
+  }
+
+  function forgetSelected($btn) {
+    var ids = selectedIds();
+    if (!ids.length) return;
+    if (!confirm('Убрать из списка выбранные кампании (' + ids.length + ')? В Keitaro они останутся как есть')) return;
+    App.busy($btn, App.api('POST', '/api/campaigns/forget', {ids: ids})).done(function (r) {
+      selected = {};
+      App.toast('Убрано из списка: ' + r.removed);
+      refresh();
     });
   }
 
@@ -408,6 +449,14 @@ var CampaignList = (function () {
       if (!confirm('Подключить в список все кампании из Keitaro? В общем трекере среди них будут и чужие кампании')) return;
       importMany($(this), {}, 'Все кампании');
     });
+    $('#check-all').on('change', function () {
+      var on = this.checked;
+      selected = {};
+      if (on) shown.forEach(function (c) { selected[c.id] = true; });
+      render();
+    });
+    $('#bulk-forget').on('click', function () { forgetSelected($(this)); });
+    $('#bulk-clear').on('click', function () { selected = {}; render(); });
     $('#f-search').on('input', render);
     $('#f-group, #f-state').on('change', render);
     $('#import-form').on('submit', function (e) {
