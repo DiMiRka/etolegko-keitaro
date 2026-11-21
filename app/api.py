@@ -248,7 +248,7 @@ async def set_stream_state(stream_id: int, body: CampaignState, session: Session
 
 
 @router.post("/streams/{stream_id}/push", response_model=StreamOut)
-async def push(stream_id: int, session: SessionDep, kt: KeitaroDep):
+async def push(stream_id: int, session: SessionDep, kt: KeitaroDep, force: bool = False):
     stream = await svc.load_stream(session, stream_id)
-    await svc.push(session, kt, stream)
+    await svc.push(session, kt, stream, force=force)
     return StreamOut.of(stream)

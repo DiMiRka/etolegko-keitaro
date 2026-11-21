@@ -542,7 +542,15 @@ var Editor = (function () {
       var $push = $('<button class="btn primary small">Опубликовать в Keitaro</button>').prop('disabled', !s.is_dirty);
       var $cancel = $('<button class="btn small">Отменить</button>').prop('disabled', !s.is_dirty);
       $push.on('click', function () {
-        act($push, s, '/push').done(function () { App.toast('Опубликовано в Keitaro'); });
+        act($push, s, '/push').done(function () { App.toast('Опубликовано в Keitaro'); }).fail(function (xhr) {
+          if (xhr.status !== 409) return;
+          var detail = (xhr.responseJSON && xhr.responseJSON.detail) || '';
+          if (!confirm(detail + '\n\nОпубликовать всё равно и перезаписать изменения в Keitaro?')) {
+            Editor.reload();
+            return;
+          }
+          act($push, s, '/push?force=true').done(function () { App.toast('Опубликовано с перезаписью'); });
+        });
       });
       $cancel.on('click', function () { act($cancel, s, '/cancel'); });
       if (s.is_dirty) $actions.prepend('<span class="badge">не опубликовано</span>');
@@ -609,7 +617,12 @@ var Editor = (function () {
       .always(function () { Journal.refresh(); });
   }
 
-  return {renderAll: renderAll, setStats: setStats};
+  function reload() {
+    var id = window.location.pathname.split('/').pop();
+    $.ajax({url: '/api/campaigns/' + id, dataType: 'json'}).done(function (c) { renderAll(c.streams); });
+  }
+
+  return {renderAll: renderAll, setStats: setStats, reload: reload};
 })();
 
 var OfferList = (function () {
@@ -706,7 +719,7 @@ var Journal = (function () {
     create: 'Создание', import: 'Подключение', update: 'Изменение', campaign_state: 'Состояние',
     fetch: 'Загрузка', sync: 'Синхронизация', add: 'Добавление', remove: 'Удаление',
     bring_back: 'Возврат', pin: 'Пин', unpin: 'Пин', cancel: 'Отмена', push: 'Публикация',
-    push_failed: 'Ошибка', stream_state: 'Состояние', settings: 'Настройки'
+    push_failed: 'Ошибка', push_conflict: 'Конфликт', stream_state: 'Состояние', settings: 'Настройки'
   };
 
   function when(iso) {

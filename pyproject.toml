@@ -1,0 +1,16 @@
+[project]
+name = "keitaro-wrapper"
+version = "0.1.0"
+description = "Обёртка над Keitaro Admin API: создание кампаний и редактор офферов в потоках"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP", "SIM", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]

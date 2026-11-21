@@ -361,7 +361,7 @@ input.geo { text-transform: uppercase; max-width: 160px; }
 .j-diff { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .j-push .j-action { color: #166534; }
 .j-push_failed .j-action, .j-push_failed .j-body { color: var(--danger); }
-.j-sync .j-action { color: #92400e; }
+.j-sync .j-action, .j-push_conflict .j-action { color: #92400e; }
 @media (max-width: 760px) {
   .journal li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }

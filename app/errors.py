@@ -4,3 +4,7 @@ class AppError(Exception):
 
 class NotFound(AppError):
     pass
+
+
+class Conflict(AppError):
+    pass

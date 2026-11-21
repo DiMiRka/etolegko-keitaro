@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from app import audit
 from app.errors import AppError as StreamError
-from app.errors import NotFound
+from app.errors import Conflict, NotFound
 from app.keitaro import KeitaroClient, KeitaroError
 from app.models import Campaign, OfferState, Stream, StreamOffer
 from app.weights import WeightError, rebalance
@@ -337,7 +337,39 @@ def push_payload(stream: Stream) -> dict:
     }
 
 
-async def push(session: AsyncSession, kt: KeitaroClient, stream: Stream) -> None:
+def _published_view(stream: Stream) -> dict[int, tuple[int, str]]:
+    return {
+        o.offer_id: (o.published_share, "disabled" if o.disabled else "active")
+        for o in stream.offers
+        if o.published_state == OfferState.active
+    }
+
+
+def _keitaro_view(data: dict) -> dict[int, tuple[int, str]]:
+    return {
+        int(o["offer_id"]): (int(o.get("share") or 0), o.get("state") or "active")
+        for o in data.get("offers") or []
+    }
+
+
+def describe_conflict(ours: dict, theirs: dict) -> list[str]:
+    changes = []
+    for offer_id in sorted(set(ours) | set(theirs)):
+        mine, kt = ours.get(offer_id), theirs.get(offer_id)
+        if mine == kt:
+            continue
+        if kt is None:
+            changes.append(f"оффер {offer_id} удалён в Keitaro")
+        elif mine is None:
+            changes.append(f"оффер {offer_id} добавлен в Keitaro ({kt[0]}%)")
+        elif mine[0] != kt[0]:
+            changes.append(f"у оффера {offer_id} доля {mine[0]}% → {kt[0]}%")
+        else:
+            changes.append(f"оффер {offer_id} {'отключён' if kt[1] == 'disabled' else 'включён'} в Keitaro")
+    return changes
+
+
+async def push(session: AsyncSession, kt: KeitaroClient, stream: Stream, force: bool = False) -> None:
     if not stream.has_offers:
         raise StreamError("В потоке нет офферов для публикации")
     active = [o for o in stream.offers if o.is_active and not o.disabled]
@@ -348,6 +380,24 @@ async def push(session: AsyncSession, kt: KeitaroClient, stream: Stream) -> None
     published_before = {
         str(o.offer_id): o.published_share for o in stream.offers if o.published_state == OfferState.active
     }
+    if not force:
+        try:
+            remote = await kt.get_stream(stream.keitaro_id)
+        except KeitaroError as e:
+            stream.last_error = str(e)
+            await session.commit()
+            raise StreamError(str(e)) from e
+        changes = describe_conflict(_published_view(stream), _keitaro_view(remote))
+        if changes:
+            message = "поток изменён в Keitaro после загрузки: " + "; ".join(changes)
+            stream.last_error = message[0].upper() + message[1:]
+            audit.record_stream(session, stream, "push_conflict", f"публикация остановлена, {message}",
+                                changes=changes)
+            await session.commit()
+            raise Conflict(
+                f"Поток изменён в Keitaro после загрузки: {'; '.join(changes)}. "
+                "Загрузите потоки заново или опубликуйте с перезаписью"
+            )
     try:
         await kt.update_stream(stream.keitaro_id, push_payload(stream))
     except KeitaroError as e:
@@ -358,7 +408,11 @@ async def push(session: AsyncSession, kt: KeitaroClient, stream: Stream) -> None
     for o in stream.offers:
         o.published_share, o.published_state = o.share, o.state
     stream.last_error = None
-    audit.record_stream(session, stream, "push", "опубликован в Keitaro", published_before)
+    audit.record_stream(
+        session, stream, "push",
+        "опубликован в Keitaro с перезаписью чужих изменений" if force else "опубликован в Keitaro",
+        published_before,
+    )
     await session.commit()
 
 

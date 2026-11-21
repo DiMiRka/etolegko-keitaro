@@ -15,7 +15,7 @@ from app.api import router as api_router
 from app.config import get_settings
 from app.db import make_engine, make_sessionmaker
 from app.deps import SessionDep
-from app.errors import AppError, NotFound
+from app.errors import AppError, Conflict, NotFound
 from app.keitaro import KeitaroClient, KeitaroError
 from app.offers import OfferCatalog
 from app.references import References
@@ -84,7 +84,8 @@ async def require_login(request: Request, call_next):
 
 @app.exception_handler(AppError)
 async def app_error_handler(request: Request, exc: AppError):
-    return JSONResponse({"detail": str(exc)}, status_code=404 if isinstance(exc, NotFound) else 400)
+    status = 404 if isinstance(exc, NotFound) else 409 if isinstance(exc, Conflict) else 400
+    return JSONResponse({"detail": str(exc)}, status_code=status)
 
 
 @app.exception_handler(KeitaroError)

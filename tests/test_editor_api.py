@@ -128,6 +128,15 @@ class EditorApiTest(ApiCase):
         self.ok("GET", "/api/campaigns/999/log", 404)
         self.ok("POST", "/api/streams/999/state", 404, json={"active": True})
 
+    def test_push_conflict_api(self):
+        self.ok("POST", f"/api/streams/{self.sid}/offers", json={"offer_id": 4})
+        self.kt.streams[OFFER_STREAM_ID]["offers"][0]["share"] = 50
+        r = self.ok("POST", f"/api/streams/{self.sid}/push", 409)
+        self.assertIn("Загрузите потоки заново", r["detail"])
+        s = self.ok("POST", f"/api/streams/{self.sid}/push", params={"force": "true"})
+        self.assertFalse(s["is_dirty"])
+        self.assertEqual(self.kt.kt_offers(), {1: 25, 2: 25, 3: 25, 4: 25})
+
     def test_import_unknown_campaign(self):
         self.ok("POST", "/api/campaigns/import", 404, json={"keitaro_id": 1})
 

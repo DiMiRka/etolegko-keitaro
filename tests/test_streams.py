@@ -355,6 +355,46 @@ class StreamServiceTest(unittest.IsolatedAsyncioTestCase):
             ["Поток «Geo»: выключен", "Поток «Geo»: включён"],
         )
 
+    async def test_push_refuses_when_keitaro_changed(self):
+        await svc.add_offer(self.session, self.stream(), 4)
+        self.kt.streams[OFFER_STREAM_ID]["offers"][0]["share"] = 50
+        self.kt.streams[OFFER_STREAM_ID]["offers"].pop(1)
+        self.kt.streams[OFFER_STREAM_ID]["offers"].append({"offer_id": 5, "share": 17, "state": "active"})
+        with self.assertRaises(svc.Conflict) as ctx:
+            await svc.push(self.session, self.kt, self.stream())
+        message = str(ctx.exception)
+        self.assertIn("у оффера 1 доля 34% → 50%", message)
+        self.assertIn("оффер 2 удалён в Keitaro", message)
+        self.assertIn("оффер 5 добавлен в Keitaro (17%)", message)
+        self.assertEqual(self.kt.updates, [])
+        self.assertTrue(self.stream().is_dirty)
+        self.assertIn("изменён в Keitaro", self.stream().last_error)
+        self.assertEqual((await self.log())[-1]["action"], "push_conflict")
+
+    async def test_force_push_overwrites(self):
+        await svc.add_offer(self.session, self.stream(), 4)
+        self.kt.streams[OFFER_STREAM_ID]["offers"][0]["share"] = 50
+        await svc.push(self.session, self.kt, self.stream(), force=True)
+        self.assertEqual(self.kt.kt_offers(), {1: 25, 2: 25, 3: 25, 4: 25})
+        last = (await self.log())[-1]
+        self.assertIn("с перезаписью", last["message"])
+
+    async def test_disabled_in_keitaro_is_conflict(self):
+        await svc.add_offer(self.session, self.stream(), 4)
+        self.kt.streams[OFFER_STREAM_ID]["offers"][2]["state"] = "disabled"
+        with self.assertRaises(svc.Conflict) as ctx:
+            await svc.push(self.session, self.kt, self.stream())
+        self.assertIn("оффер 3 отключён в Keitaro", str(ctx.exception))
+
+    async def test_no_conflict_after_refetch(self):
+        self.kt.streams[OFFER_STREAM_ID]["offers"][0]["share"] = 50
+        self.kt.streams[OFFER_STREAM_ID]["offers"][1]["share"] = 25
+        self.kt.streams[OFFER_STREAM_ID]["offers"][2]["share"] = 25
+        await self.refetch()
+        await svc.add_offer(self.session, self.stream(), 4)
+        await svc.push(self.session, self.kt, self.stream())
+        self.assertEqual(sum(self.kt.kt_offers().values()), 100)
+
     async def test_forget_campaign_drops_journal(self):
         await svc.forget_campaign(self.session, self.campaign)
         self.assertEqual(await audit.history(self.session, self.campaign.id), [])
