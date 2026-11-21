@@ -7,3 +7,4 @@ __pycache__/
 recon/
 TEST_TASK_ETOLEGKO_CONTEXT.md
 .claude/
+backups/

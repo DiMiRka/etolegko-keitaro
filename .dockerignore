@@ -9,3 +9,6 @@ tests/
 *.pyc
 *.db
 TEST_TASK_ETOLEGKO_CONTEXT.md
+backups/
+Caddyfile
+docker-compose*.yml

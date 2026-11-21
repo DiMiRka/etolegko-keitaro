@@ -71,3 +71,55 @@ jobs:
 
       - name: Build image
         run: docker build -t keitaro-wrapper .
+
+  prod-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DOMAIN: localhost
+      COMPOSE: docker compose -f docker-compose.prod.yml
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare .env
+        run: |
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
+            echo "SECRET_KEY=$(openssl rand -hex 32)"
+            echo "ADMIN_USERNAME=ci"
+            echo "ADMIN_PASSWORD=$(openssl rand -hex 12)"
+            echo "KEITARO_API_KEY=dummy"
+          } > .env
+
+      - name: Validate compose
+        run: $COMPOSE config --quiet
+
+      - name: Start
+        run: $COMPOSE up -d --build --wait --wait-timeout 180
+
+      - name: Check HTTPS, redirects and proxy headers
+        run: |
+          curl -kfsS https://localhost/health
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/health)" = "308"
+          test "$(curl -ks -o /dev/null -w '%{http_code}' https://localhost/api/campaigns)" = "401"
+          curl -ks https://localhost/login | grep -q 'href="https://localhost/static/app.css'
+          curl -ksI https://localhost/login | grep -qi '^strict-transport-security'
+
+      - name: Check that only Caddy publishes ports
+        run: |
+          test -z "$($COMPOSE port db 5432 2>/dev/null)"
+          test -z "$($COMPOSE port app 8000 2>/dev/null)"
+
+      - name: Check backup
+        run: |
+          sleep 5
+          ls -l backups
+          ls backups/keitaro-*.dump
+
+      - name: Logs on failure
+        if: failure()
+        run: $COMPOSE logs --no-color
+
+      - name: Stop
+        if: always()
+        run: $COMPOSE down -v
